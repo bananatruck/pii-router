@@ -80,3 +80,11 @@ it('finds the given names used by the built-in sample texts', async () => {
     ],
   });
 });
+it('does not end a sentence at a dot inside an email address or number', async () => {
+  const fake = new FakeModel({ location: 'device' });
+  const prompt = buildDeviceAnswerPrompt('summarize', 'Write to dana.whitfield@example.com today. Pay 4.50 now. Third.');
+  expect((await fake.generate({ prompt })).text).toBe('Write to dana.whitfield@example.com today. Pay 4.50 now.');
+  const cloud = new FakeModel({ location: 'cloud' });
+  const summary = await cloud.generate({ prompt: buildCloudPrompt('summarize', 'Mail [EMAIL_1] at v2.5 today. Later.') });
+  expect(summary.text).toBe('Summary: Mail [EMAIL_1] at v2.5 today.');
+});

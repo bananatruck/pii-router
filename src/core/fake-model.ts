@@ -1,4 +1,4 @@
-import { simulatedCloudReply } from './fake-cloud-replies';
+import { sentences, simulatedCloudReply } from './fake-cloud-replies';
 import type { GenerateRequest, GenerateResult, ModelClient, ModelLocation, ModelStatus } from './types';
 
 export type FakeBehaviour = 'ok' | 'unavailable' | 'needs-download' | 'throws' | 'bad-json' | 'wrong-source';
@@ -50,7 +50,7 @@ export class FakeModel implements ModelClient {
       for (const m of content.matchAll(ADDRESS_PATTERN)) entities.push({ text: m[0], type: 'ADDRESS' });
       text = this.behaviour === 'bad-json' ? 'Invalid JSON' : JSON.stringify({ entities });
     } else if (this.location === 'device') {
-      text = (content.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [content]).slice(0, 2).join('').trim();
+      text = sentences(content).slice(0, 2).join(' ');
     } else {
       text = simulatedCloudReply(request.prompt);
     }

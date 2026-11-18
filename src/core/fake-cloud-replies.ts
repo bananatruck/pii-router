@@ -39,8 +39,9 @@ function placeholdersIn(text: string): Array<{ token: string; type: string }> {
   }));
 }
 
-function sentences(text: string): string[] {
-  return (text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? []).map(s => s.trim()).filter(Boolean);
+/** Sentences end at . ! or ? followed by whitespace, so dots inside emails and numbers do not split. */
+export function sentences(text: string): string[] {
+  return text.trim().split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
 }
 
 function capitalise(text: string): string {
