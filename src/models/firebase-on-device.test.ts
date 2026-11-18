@@ -9,9 +9,10 @@ const {
 } = vi.hoisted(() => {
   const generateContent = vi.fn();
   const initializeDeviceModel = vi.fn();
-  const getGenerativeModel = vi.fn(() => ({
+  const getGenerativeModel = vi.fn((): Record<string, unknown> => ({
     generateContent,
     initializeDeviceModel,
+    chromeAdapter: { mode: 'only_on_device' },
   }));
   const getAI = vi.fn(() => ({ app: {}, backend: {} }));
   const initializeApp = vi.fn(() => ({ name: 'pii-router-local-device', options: {} }));
@@ -193,5 +194,15 @@ describe('FirebaseOnDeviceModel', () => {
     await model.generate({ prompt: 'one' });
     await model.generate({ prompt: 'two' });
     expect(mockGetGenerativeModel).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses and never calls generateContent when the created model has no on-device adapter', async () => {
+    mockAvailability.mockResolvedValue('available');
+    mockGetGenerativeModel.mockImplementationOnce(() => ({ generateContent: mockGenerateContent, initializeDeviceModel: mockInitializeDeviceModel }));
+    const model = new FirebaseOnDeviceModel(fakeAI);
+    await expect(model.generate({ prompt: 'SYNTHETIC-TEXT jane.doe@example.com' })).rejects.toMatchObject({
+      code: 'device-unavailable',
+    });
+    expect(mockGenerateContent).not.toHaveBeenCalled();
   });
 });

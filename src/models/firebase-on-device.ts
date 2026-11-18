@@ -109,6 +109,21 @@ export class FirebaseOnDeviceModel implements ModelClient {
     return model;
   }
 
+  /**
+   * The exact condition the SDK uses: callCloudOrDevice sends the request to the cloud whenever the
+   * model has no on-device adapter, before it looks at the mode. The SDK stores the adapter as
+   * `chromeAdapter` on the model. Checking it covers every way the adapter can be missing, such as
+   * `window.LanguageModel` differing from `globalThis.LanguageModel`, or an AI service without an
+   * adapter factory (round-2 review).
+   */
+  private assertOnDeviceAdapter(model: GenerativeModel): void {
+    if (!(model as unknown as { chromeAdapter?: unknown }).chromeAdapter) {
+      throw createDeviceUnavailableError(
+        'The SDK created the model without an on-device adapter; refusing, because it would send the prompt to the cloud.',
+      );
+    }
+  }
+
   /** Throws unless the Prompt API is on the page right now. Must run with no await before createModel. */
   private assertPromptApiPresent(): void {
     if (!(globalThis as { LanguageModel?: unknown }).LanguageModel) {
@@ -130,6 +145,7 @@ export class FirebaseOnDeviceModel implements ModelClient {
 
     this.assertPromptApiPresent();
     const defaultModel = this.createModel(undefined);
+    this.assertOnDeviceAdapter(defaultModel);
 
     // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
     // "You must call initializeDeviceModel() after or on an end-user page interaction (like a button click) and before you send a prompt request to the model."
@@ -147,6 +163,7 @@ export class FirebaseOnDeviceModel implements ModelClient {
     }
     this.assertPromptApiPresent();
     const model = this.createModel(request.responseSchema);
+    this.assertOnDeviceAdapter(model);
 
     // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
     // "To generate text output, call generateContent with the text input: const result = await model.generateContent(prompt);"

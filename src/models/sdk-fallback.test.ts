@@ -85,4 +85,26 @@ describe('SDK fallback behaviour in ONLY_ON_DEVICE mode when LanguageModel is mi
     expect(fetchStub).not.toHaveBeenCalled();
     expect(fetchCalls).toHaveLength(0);
   });
+
+  it('refuses when the created model has no on-device adapter even though LanguageModel exists (round-2 review)', async () => {
+    const fetchStub = vi.fn(async (): Promise<Response> => {
+      throw new Error('Network disabled in test');
+    });
+    globalThis.fetch = fetchStub as unknown as typeof fetch;
+    (globalThis as Record<string, unknown>).LanguageModel = { availability: async () => 'available' };
+    testApp = initializeApp(
+      { apiKey: 'fake-api-key-for-sdk-fallback-test', projectId: 'fake-project-id', appId: '1:000000000000:web:0000000000000000' },
+      'sdk-fallback-no-adapter',
+    );
+    const ai = getAI(testApp, { backend: new GoogleAIBackend() });
+    // An AI service without the adapter factory, as Codex reproduced: the SDK would build a model
+    // with no on-device adapter and send ONLY_ON_DEVICE prompts to the cloud.
+    delete (ai as unknown as Record<string, unknown>).chromeAdapterFactory;
+    const guarded = new FirebaseOnDeviceModel(ai);
+    await expect(guarded.generate({ prompt: 'SYNTHETIC-TEXT jane.doe@example.com' })).rejects.toMatchObject({
+      code: 'device-unavailable',
+    });
+    expect(fetchStub).not.toHaveBeenCalled();
+    delete (globalThis as Record<string, unknown>).LanguageModel;
+  });
 });
