@@ -216,6 +216,146 @@ describe('PII Router UI', () => {
     expect(detectorCalls).toBe(1);
   });
 
+  it('shows wrong-source cloud copy when the detector reports cloud inference', async () => {
+    const wrongSourceDevice = new FakeModel({ location: 'device', behaviour: 'wrong-source' });
+    const cloud = new FakeModel({ location: 'cloud' });
+    render(
+      <App
+        liveModels={{
+          device: wrongSourceDevice,
+          cloud,
+          liveReason: null,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cloud-blocked-panel').textContent).toContain(
+        'The text may have left this device.',
+      );
+    });
+    expect(screen.getByTestId('cloud-blocked-panel').textContent).not.toContain('Nothing was sent.');
+  });
+
+  it('disables pipeline controls while running and clears the answer when the task changes', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const slowDevice: ModelClient = {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async request => {
+        if (request.responseSchema) {
+          await gate;
+          return { text: '{"entities":[]}', ranOn: 'device' };
+        }
+        return { text: 'Local summary output.', ranOn: 'device' };
+      },
+    };
+    const stubCloud: ModelClient = {
+      location: 'cloud',
+      simulated: false,
+      label: 'Gemini Cloud',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async () => ({ text: 'Cloud reply for [PERSON_1].', ranOn: 'cloud' }),
+    };
+
+    render(
+      <App
+        liveModels={{
+          device: slowDevice,
+          cloud: stubCloud,
+          liveReason: null,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Use sample' }).hasAttribute('disabled')).toBe(true);
+    });
+    expect(screen.getByRole('button', { name: 'Edit text' }).hasAttribute('disabled')).toBe(true);
+
+    release();
+    await screen.findByTestId('restored-answer');
+    fireEvent.change(screen.getByLabelText('Task'), { target: { value: 'rewrite' } });
+    expect(screen.queryByTestId('restored-answer')).toBeNull();
+  });
+
+  it('moves focus through the sample menu with keyboard and returns focus to Use sample', async () => {
+    render(<App />);
+    const useSample = screen.getByRole('button', { name: 'Use sample' });
+    useSample.focus();
+    fireEvent.click(useSample);
+
+    const menu = await screen.findByRole('menu');
+    const items = screen.getAllByRole('menuitem');
+    await waitFor(() => {
+      expect(document.activeElement).toBe(items[0]);
+    });
+
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(items[1]);
+
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(items[0]);
+
+    fireEvent.keyDown(menu, { key: 'End' });
+    expect(document.activeElement).toBe(items[items.length - 1]);
+
+    fireEvent.keyDown(menu, { key: 'Home' });
+    expect(document.activeElement).toBe(items[0]);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).toBeNull();
+    });
+    expect(document.activeElement).toBe(useSample);
+  });
+
+  it('announces a cloud answer in the live status region without leaking the answer text', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Use sample/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('run-status').textContent).toBe(
+          'Answered through the cloud with personal details withheld.',
+        );
+      },
+      { timeout: 3000 },
+    );
+    expect(screen.getByTestId('run-status').textContent).not.toContain('Dana Whitfield');
+  });
+
+  it('announces a blocked run in the live status region', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('simulate-nano-unavailable'));
+    const taskSelect = screen.getByLabelText('Task') as HTMLSelectElement;
+    fireEvent.change(taskSelect, { target: { value: 'rewrite' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      const status = screen.getByTestId('run-status');
+      expect(status.textContent?.startsWith('Blocked: ')).toBe(true);
+    });
+  });
+
   it('adopts the normalized text on Run so the marks line up with what was scanned', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit text' }));

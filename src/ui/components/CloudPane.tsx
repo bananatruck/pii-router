@@ -44,7 +44,11 @@ export function CloudPane({
 
       {outcome?.kind === 'blocked' ? (
         <div data-testid="cloud-blocked-panel" className="mt-4 border border-stop-red bg-fog p-4">
-          <p className="text-sm font-bold text-stop-red">Nothing was sent.</p>
+          <p className="text-sm font-bold text-stop-red">
+            {outcome.reason === 'detector-wrong-source'
+              ? 'The text may have left this device.'
+              : 'Nothing was sent.'}
+          </p>
           <p className="mt-1 text-xs text-ink/80">{outcome.message}</p>
           {egressStep && !egressStep.ok && (
             <p className="mt-2 font-mono text-xs text-stop-red">

@@ -72,8 +72,9 @@ export function DevicePane({
             </span>
             <button
               type="button"
+              disabled={isRunning}
               onClick={() => setIsEditing(prev => !prev)}
-              className="border border-ink bg-fog px-2 py-0.5 text-xs font-semibold text-ink hover:bg-ink hover:text-fog"
+              className="border border-ink bg-fog px-2 py-0.5 text-xs font-semibold text-ink hover:bg-ink hover:text-fog disabled:cursor-wait disabled:opacity-60"
             >
               {isEditing ? 'Done editing' : 'Edit text'}
             </button>

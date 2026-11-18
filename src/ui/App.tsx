@@ -11,7 +11,7 @@ import {
 } from '@/core';
 import type { SampleItem } from './samples';
 import { SAMPLES } from './samples';
-import { useModels, type LiveModelSet } from './useModels';
+import { useModels, type AppMode, type LiveModelSet } from './useModels';
 import { CoverageNote } from './components/CoverageNote';
 import { Controls } from './components/Controls';
 import { Header } from './components/Header';
@@ -22,6 +22,17 @@ import { Workspace } from './components/Workspace';
 
 export interface AppProps {
   liveModels?: LiveModelSet;
+}
+
+function runStatusText(isRunning: boolean, outcome: RunOutcome | null): string {
+  if (isRunning) return 'Running.';
+  if (!outcome) return '';
+  if (outcome.kind === 'answered') {
+    if (outcome.route === 'device-only') return 'Answered on this device.';
+    return 'Answered through the cloud with personal details withheld.';
+  }
+  if (outcome.kind === 'blocked') return `Blocked: ${outcome.message}`;
+  return `Error: ${outcome.message}`;
 }
 
 export function App({ liveModels }: AppProps = {}) {
@@ -66,26 +77,6 @@ export function App({ liveModels }: AppProps = {}) {
     return () => clearTimeout(timer);
   }, [text]);
 
-  useEffect(() => {
-    if (!sampleMenuOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSampleMenuOpen(false);
-      }
-    };
-    const handlePointerDown = (event: MouseEvent) => {
-      if (sampleMenuRef.current && !sampleMenuRef.current.contains(event.target as Node)) {
-        setSampleMenuOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('mousedown', handlePointerDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('mousedown', handlePointerDown);
-    };
-  }, [sampleMenuOpen]);
-
   const livePatternFindings = useMemo<Finding[]>(() => {
     const hits = detectPatterns(debouncedText);
     const { findings } = redactSegments(
@@ -120,6 +111,21 @@ export function App({ liveModels }: AppProps = {}) {
     setOutcome(null);
     setIsEditing(false);
     setSampleMenuOpen(false);
+  };
+
+  const handleSetTask = (next: TaskId) => {
+    setTask(next);
+    setOutcome(null);
+  };
+
+  const handleSetPreference = (next: RoutePreference) => {
+    setPreference(next);
+    setOutcome(null);
+  };
+
+  const handleSetMode = (next: AppMode) => {
+    setMode(next);
+    setOutcome(null);
   };
 
   // A ref, not state: two clicks in the same frame both see isRunning === false (review finding 5).
@@ -174,14 +180,29 @@ export function App({ liveModels }: AppProps = {}) {
       {mode === 'simulated' && <SimulatedBanner />}
 
       <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
-        <Header mode={mode} setMode={setMode} deviceStatus={deviceStatus} liveReason={liveReason} locked={isRunning} />
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="run-status"
+          className="sr-only"
+        >
+          {runStatusText(isRunning, outcome)}
+        </div>
+
+        <Header
+          mode={mode}
+          setMode={handleSetMode}
+          deviceStatus={deviceStatus}
+          liveReason={liveReason}
+          locked={isRunning}
+        />
 
         <Controls
           mode={mode}
           task={task}
-          setTask={setTask}
+          setTask={handleSetTask}
           preference={preference}
-          setPreference={setPreference}
+          setPreference={handleSetPreference}
           taskSelectId={taskSelectId}
           sampleMenuOpen={sampleMenuOpen}
           setSampleMenuOpen={setSampleMenuOpen}
@@ -206,18 +227,19 @@ export function App({ liveModels }: AppProps = {}) {
             <input
               id={customInstructionId}
               type="text"
+              disabled={isRunning}
               value={customInstruction}
               onChange={e => {
                 setCustomInstruction(e.target.value);
                 setOutcome(null);
               }}
               placeholder="For example: Extract action items for Dana Whitfield"
-              className="mt-1.5 w-full border border-ink bg-fog px-3 py-1.5 font-mono text-sm text-ink"
+              className="mt-1.5 w-full border border-ink bg-fog px-3 py-1.5 font-mono text-sm text-ink disabled:cursor-wait disabled:opacity-60"
             />
           </div>
         )}
 
-        <div aria-live="polite" className="mt-4">
+        <div className="mt-4">
           <OutcomeAlerts outcome={outcome} />
 
           <Workspace

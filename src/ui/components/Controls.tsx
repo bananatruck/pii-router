@@ -1,4 +1,11 @@
-import type { RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
+} from 'react';
 import { FileText, Play } from 'lucide-react';
 import { TASKS, type ModelStatus, type RoutePreference, type TaskId } from '@/core';
 import { BorderBeam } from '@/components/vendor/border-beam';
@@ -26,6 +33,18 @@ export interface ControlsProps {
   setSimulateNanoUnavailable: (next: boolean) => void;
 }
 
+function menuItems(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return [...container.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+}
+
+function focusMenuItem(container: HTMLElement | null, index: number) {
+  const items = menuItems(container);
+  if (items.length === 0) return;
+  const wrapped = ((index % items.length) + items.length) % items.length;
+  items[wrapped]?.focus();
+}
+
 export function Controls({
   mode,
   task,
@@ -44,6 +63,73 @@ export function Controls({
   simulateNanoUnavailable,
   setSimulateNanoUnavailable,
 }: ControlsProps) {
+  const sampleButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+
+  const closeSampleMenu = useCallback(
+    (returnFocus = true) => {
+      setSampleMenuOpen(false);
+      if (returnFocus) {
+        sampleButtonRef.current?.focus();
+      }
+    },
+    [setSampleMenuOpen],
+  );
+
+  const handleSelectSample = (sample: SampleItem) => {
+    onSelectSample(sample);
+    closeSampleMenu(true);
+  };
+
+  useLayoutEffect(() => {
+    if (sampleMenuOpen) {
+      focusMenuItem(menuPanelRef.current, 0);
+    }
+  }, [sampleMenuOpen]);
+
+  useEffect(() => {
+    if (!sampleMenuOpen) return;
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeSampleMenu(true);
+      }
+    };
+    const handlePointerDown = (event: MouseEvent) => {
+      if (sampleMenuRef.current && !sampleMenuRef.current.contains(event.target as Node)) {
+        closeSampleMenu(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [sampleMenuOpen, sampleMenuRef, closeSampleMenu]);
+
+  const handleSampleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const container = menuPanelRef.current;
+    const items = menuItems(container);
+    if (items.length === 0) return;
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusMenuItem(container, currentIndex < 0 ? 0 : currentIndex + 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusMenuItem(container, currentIndex < 0 ? items.length - 1 : currentIndex - 1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      focusMenuItem(container, 0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      focusMenuItem(container, items.length - 1);
+    }
+  };
+
   return (
     <section
       aria-label="Pipeline controls"
@@ -57,9 +143,10 @@ export function Controls({
           <select
             id={taskSelectId}
             aria-label="Task"
+            disabled={isRunning}
             value={task}
             onChange={e => setTask(e.target.value as TaskId)}
-            className="border border-ink bg-fog px-3 py-1.5 text-sm font-medium text-ink"
+            className="border border-ink bg-fog px-3 py-1.5 text-sm font-medium text-ink disabled:cursor-wait disabled:opacity-60"
           >
             {TASK_IDS.map(id => (
               <option key={id} value={id}>
@@ -82,12 +169,14 @@ export function Controls({
                 <button
                   key={opt.value}
                   type="button"
+                  disabled={isRunning}
                   aria-pressed={selected}
                   onClick={() => setPreference(opt.value)}
                   className={cn(
                     'px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm',
                     idx > 0 && 'border-l border-ink',
                     selected ? 'bg-ink text-fog' : 'bg-fog text-ink hover:bg-ink/10',
+                    'disabled:cursor-wait disabled:opacity-60',
                   )}
                 >
                   {opt.label}
@@ -99,11 +188,13 @@ export function Controls({
 
         <div ref={sampleMenuRef} className="relative">
           <button
+            ref={sampleButtonRef}
             type="button"
+            disabled={isRunning}
             aria-expanded={sampleMenuOpen}
             aria-haspopup="menu"
             onClick={() => setSampleMenuOpen(prev => !prev)}
-            className="inline-flex items-center gap-1.5 border border-ink bg-fog px-3 py-1.5 text-xs font-semibold text-ink hover:bg-ink/10 sm:text-sm"
+            className="inline-flex items-center gap-1.5 border border-ink bg-fog px-3 py-1.5 text-xs font-semibold text-ink hover:bg-ink/10 disabled:cursor-wait disabled:opacity-60 sm:text-sm"
           >
             <FileText className="h-3.5 w-3.5" aria-hidden="true" />
             Use sample
@@ -111,8 +202,10 @@ export function Controls({
 
           {sampleMenuOpen && (
             <div
+              ref={menuPanelRef}
               role="menu"
               aria-label="Sample texts"
+              onKeyDown={handleSampleMenuKeyDown}
               className="absolute left-0 z-30 mt-1 w-48 border border-ink bg-fog py-1 shadow-none"
             >
               {SAMPLES.map(sample => (
@@ -120,7 +213,7 @@ export function Controls({
                   key={sample.id}
                   type="button"
                   role="menuitem"
-                  onClick={() => onSelectSample(sample)}
+                  onClick={() => handleSelectSample(sample)}
                   className="block w-full px-3 py-1.5 text-left text-sm font-medium text-ink hover:bg-device-sage"
                 >
                   {sample.label}
