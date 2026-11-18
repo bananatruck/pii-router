@@ -6,6 +6,7 @@ import { locateEntities, redactSegments, restore } from './redact';
 import { buildCloudPrompt, buildDeviceAnswerPrompt, DEVICE_CHAR_BUDGET, TASKS } from './tasks';
 import type {
   BlockReason,
+  PiiType,
   Finding,
   GenerateResult,
   Route,
@@ -101,6 +102,7 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
   let ready = false;
   let detectorFailure: BlockReason | null = null;
   const reportedByDevice = new Set<string>();
+  const reported: Array<{ text: string; type: PiiType }> = [];
   start = now();
   try {
     ready = deps.device.location === 'device' && (await deps.device.status()).state === 'ready';
@@ -116,7 +118,12 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
         const parsed = parseDetectorOutput(result.text);
         if (!parsed.ok) { detectorFailure = 'detector-bad-output'; break; }
         for (const entity of parsed.entities) reportedByDevice.add(entity.text);
-        for (const entity of locateEntities(segments[segment], parsed.entities)) {
+        reported.push(...parsed.entities);
+      }
+      // Apply everything Gemini Nano reported to both segments: a name it saw in the instruction
+      // must also be redacted in the text, and vice versa (round-2 review).
+      for (const segment of ['instruction', 'text'] satisfies SegmentId[]) {
+        for (const entity of locateEntities(segments[segment], reported)) {
           candidates.push({ ...entity, segment, source: 'device-model' });
         }
       }

@@ -57,8 +57,11 @@ describe('redaction', () => {
   });
   it('locates entities case-insensitively with flexible internal whitespace', () => {
     const text = 'Patient Dana Whitfield';
+    // The full name, plus each part on its own (round-2 review: parts in any case are redacted too).
     expect(locateEntities(text, [{ text: 'dana  whitfield', type: 'PERSON' }])).toEqual([
       { type: 'PERSON', value: 'Dana Whitfield', start: 8, end: 22 },
+      { type: 'PERSON', value: 'Dana', start: 8, end: 12 },
+      { type: 'PERSON', value: 'Whitfield', start: 13, end: 22 },
     ]);
   });
   it('locates case-insensitive matches and ignores absent, short, or placeholder entities', () => {

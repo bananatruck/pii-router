@@ -74,3 +74,36 @@ describe('round-2 review: values the patterns claim to catch, in hostile surroun
     expectAbsent(await sentToCloud({ text }), values);
   });
 });
+
+describe('round-2 review: what Gemini Nano reported must be applied everywhere', () => {
+  it('a model entity that includes a generated placeholder still redacts its other part', async () => {
+    const payload = await sentToCloud(
+      { text: '48 Larkspur Lane alice@example.com' },
+      [{ text: '48 Larkspur Lane [EMAIL_1]', type: 'ADDRESS' }],
+    );
+    expectAbsent(payload, ['Larkspur', 'alice@example.com']);
+  });
+
+  it('a name reported in the instruction is also redacted in the text, and vice versa', async () => {
+    const payload = await sentToCloud(
+      { text: 'Dana', task: 'custom', customInstruction: 'Write to Dana Whitfield.' },
+      [{ text: 'Dana Whitfield', type: 'PERSON' }],
+    );
+    expectAbsent(payload, ['Dana', 'Whitfield']);
+  });
+
+  it('two-letter and lowercase name parts are redacted', async () => {
+    expectAbsent(await sentToCloud({ text: 'Li Wu. Li called.' }, [{ text: 'Li Wu', type: 'PERSON' }]), ['Li ', 'Wu']);
+    expectAbsent(
+      await sentToCloud({ text: 'Dana Whitfield. dana called.' }, [{ text: 'dana whitfield', type: 'PERSON' }]),
+      ['dana'],
+    );
+  });
+
+  it('keeps dates, short order numbers and prices readable', async () => {
+    const payload = await sentToCloud({ text: 'Order #A-20931 shipped on 2026-11-18 for $1,250.00.' });
+    expect(payload).toContain('#A-20931');
+    expect(payload).toContain('2026-11-18');
+    expect(payload).toContain('$1,250.00');
+  });
+});

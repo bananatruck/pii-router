@@ -37,12 +37,32 @@ function hasAlphanumericWordBoundary(text: string, start: number, end: number): 
   return true;
 }
 
+/** Name particles that would over-redact ordinary words if treated as names on their own. */
+const NAME_PARTICLES = new Set(['de', 'da', 'di', 'du', 'del', 'der', 'den', 'la', 'le', 'van', 'von', 'bin', 'al']);
+
+/**
+ * Each part of a reported full name, so a later "Dana" or "Li" alone is redacted too. Any case and
+ * any length from 2 letters (round-2 review: "Li Wu" then "Li", and lowercase "dana").
+ */
 function personNameParts(entity: { text: string; type: PiiType }): Array<{ text: string; type: PiiType }> {
-  const words = entity.text.trim().split(/\s+/);
+  const words = entity.text.trim().split(/\s+/).map(word => word.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, ''));
   if (entity.type !== 'PERSON' || words.length < 2) return [];
   return words
-    .filter(word => word.length >= 3 && /^[A-Z]/.test(word))
+    .filter(word => word.length >= 2 && !NAME_PARTICLES.has(word.toLowerCase()))
     .map(word => ({ text: word, type: 'PERSON' as const }));
+}
+
+/**
+ * The detector reads pattern-redacted text, so it may report "48 Larkspur Lane [EMAIL_1]". The
+ * placeholder is not in the original text; locate the parts around it instead (round-2 review).
+ */
+function entityPieces(entity: { text: string; type: PiiType }): Array<{ text: string; type: PiiType }> {
+  if (!new RegExp(PLACEHOLDER_SOURCE, 'i').test(entity.text)) return [entity];
+  return entity.text
+    .split(new RegExp(PLACEHOLDER_SOURCE.replace(/\((?!\?)/g, '(?:'), 'gi'))
+    .map(piece => piece.trim().replace(/^[,;:.\s]+|[,;:.\s]+$/g, ''))
+    .filter(piece => piece.length >= 2)
+    .map(piece => ({ text: piece, type: entity.type }));
 }
 
 function compareCandidates(a: Candidate, b: Candidate): number {
@@ -167,7 +187,8 @@ function flexibleEntityPattern(entityText: string): RegExp {
 
 export function locateEntities(text: string, entities: Array<{ text: string; type: PiiType }>): LocatedEntity[] {
   const hits: LocatedEntity[] = [];
-  const expanded = [...entities, ...entities.flatMap(personNameParts)];
+  const pieces = entities.flatMap(entityPieces);
+  const expanded = [...pieces, ...pieces.flatMap(personNameParts)];
   for (const entity of expanded) {
     if (entity.text.length < 2 || onlyPlaceholder.test(entity.text)) continue;
     const regex = flexibleEntityPattern(entity.text);
