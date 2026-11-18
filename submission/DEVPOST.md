@@ -77,7 +77,7 @@ The commit history says which agent wrote what.
 The hardest part was that the obvious hybrid mode is the wrong one for privacy.
 `PREFER_ON_DEVICE`, the mode every sample uses, silently sends the prompt to the cloud when Gemini Nano is missing, which for this app would be exactly the leak it exists to prevent.
 So raw text only ever goes to a model in `ONLY_ON_DEVICE` mode.
-Then, reading the SDK source, I found that even `ONLY_ON_DEVICE` goes to the cloud when the browser has no Prompt API at all: `getGenerativeModel` creates no on-device adapter when `window.LanguageModel` is missing, and `callCloudOrDevice` then calls the cloud before it looks at the mode.
+Then, reading the SDK source, I found that even `ONLY_ON_DEVICE` goes to the cloud when the browser has no Prompt API at all: `getGenerativeModel` creates no on-device adapter when `(window || self).LanguageModel` is missing, and `callCloudOrDevice` then calls the cloud before it looks at the mode.
 The docs say that mode should throw.
 I reproduced it twice: in a unit test with the real SDK and a stubbed `fetch`, and in a real Chromium with `e2e/sdk-probe.mjs`, which removes `LanguageModel`, intercepts Google hosts, and records that the SDK tried to POST the prompt to `firebasevertexai.googleapis.com` while my wrapper made no request at all.
 PII Router now checks for the Prompt API and its availability before every on-device call.
@@ -85,7 +85,7 @@ PII Router now checks for the Prompt API and its availability before every on-de
 ### Accomplishments that I'm proud of
 
 The privacy claim is something the tests check, on the exact outbound payload, not a sentence in a README.
-An adversarial review found real holes before anyone else could, and they are closed.
+Two adversarial reviews found real holes before anyone else could; each one they found is fixed with a test, and the limits that remain are written down.
 The app fails closed: no Gemini Nano, no cloud call.
 The UI makes the trust boundary visible, so a non-technical user can see that the cloud got `[PERSON_1]` and not the name.
 
@@ -116,7 +116,7 @@ App Check is initialised before `getAI` with the reCAPTCHA Enterprise provider; 
 The hosted demo (https://bananatruck.github.io/pii-router/) runs in a clearly labelled Simulated mode in any browser: a deterministic stand-in plays both models so you can see the whole flow, including the fail-closed path ("Simulate Gemini Nano unavailable").
 To run the real models: clone the repository, `pnpm install`, add a Firebase web config with Firebase AI Logic (Gemini Developer API) enabled to `src/firebase-config.ts`, run `pnpm dev`, register the App Check debug token printed in the console, and open `http://localhost:5173` in desktop Chrome 139 or later with `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input` enabled.
 The README has the full steps.
-No account, payment or personal data is needed; the app includes synthetic samples.
+The simulated demo needs no account, payment or personal data, and the app includes synthetic samples; the real path needs a free Firebase project as described above.
 
 ## Existing project?
 

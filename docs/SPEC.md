@@ -87,21 +87,21 @@ Each line names the page it comes from.
 
 `PREFER_ON_DEVICE` is the mode every sample uses, and it silently sends the prompt to the cloud when Nano is missing.
 For a privacy tool that would be a leak.
-So raw text is only ever given to a model created with `InferenceMode.ONLY_ON_DEVICE`, which throws instead of falling back.
+So raw text is only ever given to a model created with `InferenceMode.ONLY_ON_DEVICE`, which throws instead of falling back when it has an on-device adapter; section 2.2 explains the case where it has none and how the app refuses it.
 As a second check, any on-device answer whose `inferenceSource` is not `ON_DEVICE` is discarded and the run is blocked.
 The cloud model is created with `InferenceMode.ONLY_IN_CLOUD` and only ever receives the redacted payload.
 The `PREFER_*` modes are not used anywhere in this app.
 
 ### 2.2 An SDK behaviour that contradicts the docs, found by reading the source
 
-In the installed SDK (`firebase` 13.4.0, which bundles `@firebase/ai` 3.1.0), `getGenerativeModel` builds its on-device adapter through `chromeAdapterFactory`, which returns `undefined` when `window.LanguageModel` does not exist (`dist/esm/index.esm.js`, `function chromeAdapterFactory`).
+In the installed SDK (`firebase` 13.4.0, which bundles `@firebase/ai` 3.1.0), `getGenerativeModel` builds its on-device adapter by calling the AI service's optional `chromeAdapterFactory` (`ai.chromeAdapterFactory?.(...)`), and that factory reads `(window || getGlobal()).LanguageModel` and returns `undefined` unless both that value and the mode are truthy (`dist/esm/index.esm.js`, `function chromeAdapterFactory`, `if (languageModel && mode)`).
 `callCloudOrDevice` then starts with `if (!chromeAdapter) { return { response: await inCloudCall(), inferenceSource: InferenceSource.IN_CLOUD } }`, before it looks at the mode.
-So in a browser without the Prompt API at all (Firefox, Safari, older Chrome, Chrome with the API off), a model created with `ONLY_ON_DEVICE` sends the prompt to the cloud instead of throwing.
+So whenever no adapter is created (a browser without the Prompt API at all, such as Firefox, Safari, older Chrome or Chrome with the API off; a page where `window.LanguageModel` is missing or falsy; or an AI service without the factory), a model created with `ONLY_ON_DEVICE` sends the prompt to the cloud instead of throwing. Streaming and chat use the same dispatcher, and `countTokens` without an adapter also goes to the cloud (checked by the round-2 review).
 The docs say `ONLY_ON_DEVICE` should "throw an exception" when the on-device model is not available.
 The SDK's `InferenceSource` values are the strings `"on_device"` and `"in_cloud"`, so code must compare with the exported constant, not with the text `ON_DEVICE` printed in the docs.
 Consequences for this app:
 
-- `FirebaseOnDeviceModel` refuses to call `generateContent` unless `LanguageModel` exists on the global object and `LanguageModel.availability()` is not `unavailable`; this check runs before every call, not once.
+- `FirebaseOnDeviceModel` refuses to call `generateContent` unless `LanguageModel` exists on the global object, `LanguageModel.availability()` is not `unavailable`, and the model it just created has an on-device adapter (`model.chromeAdapter`, the exact condition `callCloudOrDevice` tests); these checks run before every call, and the app never uses streaming, chat or `countTokens`.
 - A test runs the real SDK with no `LanguageModel` and a stubbed `fetch`, and shows the SDK would call the network in `ONLY_ON_DEVICE` mode, while our wrapper blocks the call and `fetch` is never reached.
 - The `inferenceSource` check stays as a second line, but it runs after the fact and is not relied on for the guarantee.
 
@@ -111,7 +111,7 @@ Confirmed twice on 2026-11-18:
 - `e2e/sdk-probe.mjs` repeats this in Playwright's Chromium 156 with `window.LanguageModel` removed and every Google host intercepted and aborted: the SDK tried to POST the prompt to `firebasevertexai.googleapis.com`; `FirebaseOnDeviceModel` threw `device-unavailable` and made no request.
 
 A related observation from the same Chromium on `localhost`, checked by hand during the build and not recorded by a script: `LanguageModel` exists and reports `downloadable`.
-In that state our guard lets the call through, because the SDK's `ONLY_ON_DEVICE` path then waits for the on-device download and has a real on-device adapter; it does not go to the cloud.
+In that state our guard lets the call through, because the model has a real on-device adapter: the SDK's `ONLY_ON_DEVICE` path awaits the adapter's existing download promise (a fresh adapter has none) and then creates a Prompt API session, which may start the download or fail; it does not go to the cloud.
 The router never asks the on-device model for anything unless its status is `ready`, so in practice the app blocks instead of waiting.
 
 ## 3. Data flow and the trust boundary
@@ -157,7 +157,8 @@ The router never asks the on-device model for anything unless its status is `rea
 ```
 
 The vault, the original text and the restored answer exist only in page memory.
-Nothing is written to `localStorage`, `sessionStorage`, IndexedDB, cookies or logs.
+The app writes none of them to `localStorage`, `sessionStorage`, IndexedDB, cookies or logs.
+In live mode the Firebase App Check SDK stores its own App Check token (in a debug build, the debug token) in browser storage; that is not user text.
 The app makes no analytics or third-party requests; fonts are bundled.
 The only network calls in live mode are the Firebase SDK's own calls (App Check and the AI Logic endpoint).
 
@@ -216,9 +217,9 @@ Errors shown to the user and thrown inside the app never contain raw input, vaul
 
 ## 7. What is and is not caught
 
-Caught by the deterministic patterns, after normalization: email addresses (including non-ASCII letters), phone numbers in common North American and international formats, payment card numbers with spaces, dashes or dots that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form with invalid ranges excluded, IPv4 addresses.
-Caught by Gemini Nano, best effort: personal names, street addresses, and other identifiers the model recognises.
-Not guaranteed: names and addresses the on-device model misses (including when text in the input persuades it to report nothing; an empty answer cannot be told apart from a clean text), identifiers in formats the patterns do not cover, personal data implied by context (for example "my neighbour, the only dentist in town"), and anything inside images or attachments, which are not accepted.
+Caught by the deterministic patterns, after normalization: email addresses (including non-ASCII letters), phone numbers in common North American and international formats, payment card numbers with spaces, dashes or dots that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form with invalid ranges excluded, IPv4 addresses (quoted email local parts and IBANs from any country included). Any other run of 9 or more digits, even inside a URL or an identifier or split across lines, is masked as an ID.
+Caught by Gemini Nano, best effort: personal names, street addresses, and other identifiers the model recognises; what it reports in either segment is redacted in both, together with each part of a reported name.
+Not guaranteed: names and addresses the on-device model misses (including when text in the input persuades it to report nothing; an empty answer cannot be told apart from a clean text), identifiers with fewer than 9 digits in formats the patterns do not cover (for example a 7-digit local phone number), a value split between the custom instruction and the text, personal data implied by context (for example "my neighbour, the only dentist in town"), and anything inside images or attachments, which are not accepted.
 The README and the app say this in plain words.
 
 ## 8. Adversarial review
@@ -233,6 +234,12 @@ Its findings and what was done:
 - A prompt injection that makes Gemini Nano report no entities cannot be detected; model-reported values are now matched case-insensitively and across whitespace, and section 7 states the limit.
 
 The review also checked, and found holding: placeholder injection, cloud error messages, storage, URLs, the clipboard (only on the user's Copy click), and that `ONLY_IN_CLOUD` is the only mode used for the cloud model.
+
+On 2026-11-18 (afternoon) GPT 6.1 Sol through Codex reviewed it again, read-only, running in-memory probes against `runPipeline`; its raw output is kept outside the repository with the build notes.
+It found that numbers the patterns claim to catch still leaked in hostile surroundings (an extension after a phone, a card inside a URL or after an underscore, digits split across lines, slashed or doubled separators, user-typed placeholder lookalikes), that quoted email local parts and IBANs from countries missing from the length table were missed, that entities reported around a generated placeholder or in only one segment were not applied, and that short or lowercase name parts were sent.
+Fixed with tests: a second-phase catch-all for runs of 9 or more digits, placeholder exemption limited to placeholders the run generated, quoted local parts, IBANs from any country, entity pieces, cross-segment application and relaxed name parts.
+It also showed the on-device guard could be bypassed when `window.LanguageModel` and `globalThis.LanguageModel` differ or the AI service has no adapter factory; the wrapper now checks the created model's own adapter.
+The privacy suite now has adversarial cases that declare, independently of the detectors, the values that must be absent from the payload (`src/core/adversarial.test.ts`).
 
 ## 9. Test plan
 

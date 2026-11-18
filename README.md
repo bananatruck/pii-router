@@ -73,22 +73,23 @@ For a privacy tool that fallback is the leak, so raw text only ever goes to a mo
 
 ### A finding from reading the SDK source
 
-In the installed SDK (`firebase` 13.4.0, `@firebase/ai` 3.1.0), when the browser has no Prompt API at all (`window.LanguageModel` is undefined), `getGenerativeModel` creates no on-device adapter, and `callCloudOrDevice` then sends the request to the cloud before it checks the mode.
+In the installed SDK (`firebase` 13.4.0, `@firebase/ai` 3.1.0), `getGenerativeModel` creates an on-device adapter only when `(window || self).LanguageModel` is truthy and the AI service has an adapter factory; without one, `callCloudOrDevice` sends the request to the cloud before it checks the mode.
 So even `ONLY_ON_DEVICE` sends the prompt to the cloud in Firefox, Safari, or Chrome with the API turned off, although the docs say it should throw.
 PII Router checks for the Prompt API and its availability before every on-device call, and `src/models/sdk-fallback.test.ts` demonstrates both the SDK behaviour (with the real SDK and a stubbed `fetch`) and that our wrapper never reaches the network.
 Details: [docs/SPEC.md, section 2.2](docs/SPEC.md#22-an-sdk-behaviour-that-contradicts-the-docs-found-by-reading-the-source).
 
 ## What it catches and what it can miss
 
-Caught by deterministic patterns, with no model, after removing invisible characters and folding look-alikes: email addresses, phone numbers in common North American and international formats, payment card numbers that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form, and IPv4 addresses.
+Caught by deterministic patterns, with no model, after removing invisible characters and folding look-alikes: email addresses, phone numbers in common North American and international formats, payment card numbers that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form, and IPv4 addresses; any other run of 9 or more digits, even inside a URL or split across lines, is masked as an ID.
 Caught by Gemini Nano, best effort: personal names (and later uses of their first or last name alone), street addresses, and other identifiers the model recognises.
-Can be missed: names and addresses Gemini Nano does not recognise (including when text in the input talks it into reporting nothing), identifiers in formats the patterns do not cover, personal details implied by context ("my neighbour, the only dentist in town"), and anything in images or attachments, which the app does not accept.
+Can be missed: names and addresses Gemini Nano does not recognise (including when text in the input talks it into reporting nothing), identifiers with fewer than 9 digits in formats the patterns do not cover (such as a 7-digit local phone number), a value split between the custom instruction and the text, personal details implied by context ("my neighbour, the only dentist in town"), and anything in images or attachments, which the app does not accept.
 Treat PII Router as a strong filter, not a guarantee of anonymity.
 
 ## Adversarial review
 
 Before publishing, a second model (Cursor with grok-4.7-high) reviewed the code with one job: make a personal value reach the cloud, logs, storage or an error message.
 It found four real ways, all fixed with tests: invisible and look-alike characters that hid values from the patterns, a model span that lost an overlap and was dropped whole, a race that could build an on-device model without its on-device adapter, and a double click that could start two runs.
+A second review by GPT 6.1 Sol (through Codex) found more: numbers hidden by their surroundings (inside URLs, after an extension, split across lines), quoted emails, IBANs from countries the table lacked, model findings that were not applied everywhere, and two more ways the on-device adapter could be missing; those are fixed with tests as well.
 The full list, including what it checked and found safe, is in [docs/SPEC.md, section 8](docs/SPEC.md#8-adversarial-review).
 
 ## Status
