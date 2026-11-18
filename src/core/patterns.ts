@@ -5,8 +5,8 @@ export interface PatternHit { type: PiiType; value: string; start: number; end: 
 
 const PLACEHOLDER_IN_BRACKETS = /^\[\s*[A-Z]+[ _-]+\d+(?:[ _-]+[A-Z]+)?\s*\]$/i;
 const EMAIL_PATTERN =
-  /(?<![\w.+$€£-])[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?/gi;
-const EMAIL_DOMAIN = /(?:\.[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?)+/gi;
+  /(?<![\w.+$€£-])[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]+@[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?/giu;
+const EMAIL_DOMAIN = /(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)+/giu;
 const NA_PHONE_SEPARATED =
   /(?<![\w.+$€£-])(?:\+?1[ .-]?)?(?:\([2-9]\d{2}\)[ .-]?|[2-9]\d{2}[ .-])\d{3}[ .-]?\d{4}(?![\w]|\.\d)/g;
 const NA_PHONE_COMPACT =
@@ -27,7 +27,7 @@ function insidePlaceholder(
 }
 
 function cardPattern(length: number): RegExp {
-  return new RegExp(String.raw`(?<![\w-])\d(?:[ -]?\d){${length - 1}}(?![\w-])`, 'g');
+  return new RegExp(String.raw`(?<![\w-])\d(?:[ .-]?\d){${length - 1}}(?![\w-])`, 'g');
 }
 
 export function detectPatterns(text: string): PatternHit[] {

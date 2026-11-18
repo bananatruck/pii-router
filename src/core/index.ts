@@ -1,5 +1,6 @@
 export * from './types';
 export * from './checksums';
+export * from './normalize';
 export * from './patterns';
 export * from './redact';
 export * from './egress-guard';

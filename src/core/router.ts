@@ -1,5 +1,6 @@
 import { buildDetectorPrompt, ENTITY_SCHEMA, parseDetectorOutput } from './device-detector';
 import { checkEgress } from './egress-guard';
+import { normalizeInputDetail } from './normalize';
 import { detectPatterns } from './patterns';
 import { locateEntities, redactSegments, restore } from './redact';
 import { buildCloudPrompt, buildDeviceAnswerPrompt, DEVICE_CHAR_BUDGET, TASKS } from './tasks';
@@ -81,13 +82,22 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
     return result.ranOn === 'device' || (deps.device.simulated && result.ranOn === 'simulated');
   }
   if (!input.text.trim()) return blocked('empty-input');
-  const segments = { instruction: input.task === 'custom' ? input.customInstruction ?? '' : '', text: input.text };
+  const normText = normalizeInputDetail(input.text);
+  const normInstruction = normalizeInputDetail(
+    input.task === 'custom' ? input.customInstruction ?? '' : '',
+  );
+  const segments = { instruction: normInstruction.text, text: normText.text };
+  const normChanges = normText.changeCount + normInstruction.changeCount;
   let start = now();
   const candidates = patternCandidates(segments);
   let redaction = redactSegments(segments, candidates);
   trace.findings = redaction.findings;
   trace.redactedText = redaction.redacted.text;
-  step('patterns', true, `${candidates.length} pattern findings.`, start);
+  const patternNote =
+    normChanges > 0
+      ? `Normalized invisible or look-alike characters first. ${candidates.length} pattern findings.`
+      : `${candidates.length} pattern findings.`;
+  step('patterns', true, patternNote, start);
   let ready = false;
   let detectorFailure: BlockReason | null = null;
   const reportedByDevice = new Set<string>();

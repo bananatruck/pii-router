@@ -4,6 +4,17 @@ import { chooseRoute, runPipeline } from './router';
 import { buildCloudPrompt, buildDeviceAnswerPrompt, DEVICE_CHAR_BUDGET, TASKS } from './tasks';
 import type { ModelClient, RunInput, TaskId } from './types';
 const base: RunInput = { text: 'A short note.', task: 'summarize', preference: 'auto' };
+function deviceGenerateEmpty(): ModelClient {
+  const fake = new FakeModel({ location: 'device' });
+  return {
+    location: 'device',
+    simulated: true,
+    label: fake.label,
+    status: () => fake.status(),
+    prepare: () => fake.prepare(),
+    generate: async () => ({ text: '{"entities":[]}', ranOn: 'simulated' }),
+  };
+}
 describe('routing', () => {
   it.each([
     ['device', true, 'device-only'], ['device', false, null],
@@ -123,7 +134,29 @@ it('builds fixed task prompts and includes instructions only for custom tasks', 
     expect(buildDeviceAnswerPrompt(task, 'Original', 'Custom').includes('Instruction:\nCustom')).toBe(task === 'custom');
   }
 });
-it('labels only model steps as simulated; deterministic steps run on the device for real', async () => {
+  it('redacts or blocks obfuscated pattern values when the device model returns nothing', async () => {
+    const text =
+      'Card 4111\u200b1111\u200b1111\u200b1111, also '
+      + '\uFF14\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11\uFF11, ' // 16 fullwidth digits
+      + 'mail ada@ex\u200bample.com and josé@example.com, phone (312) 555-\n0142.';
+    const cloud = new RecordingModel(new FakeModel({ location: 'cloud' }));
+    const device = deviceGenerateEmpty();
+    const result = await runPipeline(
+      { text, task: 'rewrite', preference: 'cloud' },
+      { device, cloud },
+    );
+    // Every value but the phone is redacted after normalization; the phone split by a newline is only
+    // visible to the guard's folded re-scan, so the run must stop there with nothing sent.
+    expect(result).toMatchObject({ kind: 'blocked', reason: 'egress-guard' });
+    expect(cloud.requests).toHaveLength(0);
+    expect(result.trace.outboundPayload).toBeNull();
+    expect(result.trace.steps.find(s => s.id === 'patterns')?.note).toContain('Normalized');
+    expect(result.trace.redactedText).not.toMatch(/4111|1111/);
+    expect(result.trace.redactedText).not.toContain('ada@');
+    expect(result.trace.redactedText).not.toContain('josé@');
+    expect(result.trace.findings.filter(f => f.type === 'CARD')).toHaveLength(2);
+  });
+  it('labels only model steps as simulated; deterministic steps run on the device for real', async () => {
   const result = await runPipeline(
     { text: 'Dana Whitfield at dana@example.com.', task: 'rewrite', preference: 'cloud' },
     { device: new FakeModel({ location: 'device' }), cloud: new FakeModel({ location: 'cloud' }) },

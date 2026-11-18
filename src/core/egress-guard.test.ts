@@ -12,3 +12,8 @@ it.each(['alice example', '202.555.0100', 'new@example.net', '4111 1111 1111 111
 });
 it('detects reformatted digits even when separated across payload fields', () => expect(checkEgress('202 / 555 / 0100', vault).ok).toBe(false));
 it('allows clean placeholders', () => expect(checkEgress('Hello [PERSON_1] [PHONE_1]', vault)).toEqual({ ok: true }));
+it('blocks a phone split across a newline in the folded scan', () => {
+  const result = checkEgress('Call (312) 555-\n0142 today.', vault);
+  expect(result.ok).toBe(false);
+  if (!result.ok) expect(result.reason).toBe('Remaining PHONE pattern.');
+});
