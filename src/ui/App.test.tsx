@@ -212,4 +212,17 @@ describe('PII Router UI', () => {
     await screen.findByTestId('cloud-device-only-panel');
     expect(detectorCalls).toBe(1);
   });
+
+  it('adopts the normalized text on Run so the marks line up with what was scanned', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit text' }));
+    fireEvent.change(screen.getByLabelText('Input text'), {
+      target: { value: 'Card 4111\u200b1111\u200b1111\u200b1111 please.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await screen.findByTestId('restored-answer', {}, { timeout: 5000 });
+    const marked = screen.getByTestId('marked-input');
+    expect(marked.textContent).toContain('4111111111111111');
+    expect(marked.querySelector('mark')?.textContent ?? '').toContain('4111111111111111');
+  });
 });

@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   detectPatterns,
   redactSegments,
+  normalizeInput,
   runPipeline,
   type Finding,
   type RoutePreference,
@@ -130,12 +131,18 @@ export function App({ liveModels }: AppProps = {}) {
     setIsRunning(true);
     setIsEditing(false);
     setCopied(false);
+    // The pipeline scans normalized text (no invisible characters, NFKC); show that same text so
+    // the marks line up with the findings' offsets.
+    const scannedText = normalizeInput(text);
+    const scannedInstruction = normalizeInput(customInstruction);
+    if (scannedText !== text) setText(scannedText);
+    if (scannedInstruction !== customInstruction) setCustomInstruction(scannedInstruction);
     try {
       const result = await runPipeline(
         {
-          text,
+          text: scannedText,
           task,
-          customInstruction: task === 'custom' ? customInstruction : undefined,
+          customInstruction: task === 'custom' ? scannedInstruction : undefined,
           preference,
         },
         { device, cloud },
