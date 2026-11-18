@@ -170,4 +170,28 @@ describe('FirebaseOnDeviceModel', () => {
     expect(caught?.code).toBe('device-unavailable');
     expect(mockGenerateContent).not.toHaveBeenCalled();
   });
+
+  it('refuses when LanguageModel disappears while availability is being checked (review finding 3)', async () => {
+    mockAvailability.mockImplementation(async () => {
+      delete (globalThis as Record<string, unknown>).LanguageModel;
+      return 'available';
+    });
+    const model = new FirebaseOnDeviceModel(fakeAI);
+    await expect(model.generate({ prompt: 'SYNTHETIC-TEXT jane.doe@example.com' })).rejects.toMatchObject({
+      code: 'device-unavailable',
+    });
+    expect(mockGetGenerativeModel).not.toHaveBeenCalled();
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+  });
+
+  it('creates a fresh model for every call so a model built without the Prompt API is never reused', async () => {
+    mockAvailability.mockResolvedValue('available');
+    mockGenerateContent.mockResolvedValue({
+      response: { text: () => '{"entities":[]}', inferenceSource: 'on_device' },
+    });
+    const model = new FirebaseOnDeviceModel(fakeAI);
+    await model.generate({ prompt: 'one' });
+    await model.generate({ prompt: 'two' });
+    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(2);
+  });
 });

@@ -57,7 +57,24 @@ describe('fail closed', () => {
     expect(result).toMatchObject({ kind: 'blocked', reason: 'detector-failed' });
     expect(recorder.requests).toHaveLength(0);
   });
-  it.each(['bad-json', 'wrong-source'] satisfies FakeBehaviour[])('allows device-only answering after detector %s', async behaviour => {
+  it('stops every route, including device-only, when the detector reports a cloud run', async () => {
+    const recorder = cloud();
+    const fake = new FakeModel({ location: 'device', behaviour: 'wrong-source' });
+    const answers: string[] = [];
+    const local = device({
+      generate: r => {
+        if (r.responseSchema) return fake.generate(r);
+        answers.push(r.prompt);
+        return Promise.resolve({ text: 'Local answer', ranOn: 'device' });
+      },
+    });
+    const result = await runPipeline({ ...base, preference: 'device' }, { device: local, cloud: recorder });
+    expect(result).toMatchObject({ kind: 'blocked', reason: 'detector-wrong-source' });
+    expect(answers).toHaveLength(0);
+    expect(recorder.requests).toHaveLength(0);
+    if (result.kind === 'blocked') expect(result.message).not.toContain('Nothing was sent');
+  });
+  it.each(['bad-json'] satisfies FakeBehaviour[])('allows device-only answering after detector %s', async behaviour => {
     const recorder = cloud();
     const fake = new FakeModel({ location: 'device', behaviour });
     const local = device({ generate: r => r.responseSchema ? fake.generate(r) : Promise.resolve({ text: 'Local answer', ranOn: 'device' }) });

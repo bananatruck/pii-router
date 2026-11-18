@@ -68,7 +68,8 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
         'Local detection is unavailable. Names and addresses cannot be checked. Nothing was sent.',
       'detector-failed': 'Local detection failed. Nothing was sent.',
       'detector-bad-output': 'Local detection returned invalid data. Nothing was sent.',
-      'detector-wrong-source': 'The detector reported an unexpected inference source. Nothing was sent by the router.',
+      'detector-wrong-source':
+        'The on-device step reported that it ran in the cloud, so the text may already have left this device. Stopped; nothing more was sent.',
       'device-answer-unavailable': 'The on-device answer model is unavailable.',
       'device-answer-failed': 'The on-device answer failed.',
       'device-answer-wrong-source': 'The answer model reported an unexpected inference source.',
@@ -129,6 +130,9 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
   const route = chooseRoute(input, ready);
   step('route', route !== null, route ?? 'Requested local route unavailable.', start);
   if (route === null) return blocked('device-answer-unavailable');
+  // A detector call that reports a cloud run means the SDK may already have sent the text: stop every
+  // route, including device-only, rather than make another model call (review finding 3).
+  if (detectorFailure === 'detector-wrong-source') return blocked(detectorFailure);
   if (route === 'device-only') {
     start = now();
     try {

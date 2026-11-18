@@ -68,7 +68,6 @@ export class FirebaseOnDeviceModel implements ModelClient {
   readonly label = 'Gemini Nano on this device (Firebase AI Logic, ONLY_ON_DEVICE)';
 
   private readonly explicitAI?: AI;
-  private readonly modelCache = new Map<string, GenerativeModel>();
 
   constructor(ai?: AI) {
     this.explicitAI = ai;
@@ -78,13 +77,12 @@ export class FirebaseOnDeviceModel implements ModelClient {
     return this.explicitAI ?? getOrCreateLocalAI();
   }
 
-  private getModelForSchema(schema?: JsonSchema): GenerativeModel {
-    const cacheKey = schema ? JSON.stringify(schema) : '__default__';
-    const cached = this.modelCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
+  /**
+   * Builds a new model for every call, never cached: the SDK decides at creation time whether the
+   * model gets an on-device adapter, and a model created while LanguageModel was missing would send
+   * every later prompt to the cloud (docs/SPEC.md section 2.2).
+   */
+  private createModel(schema?: JsonSchema): GenerativeModel {
     const ai = this.resolveAI();
 
     // https://firebase.google.com/docs/ai-logic/hybrid/web/configuration-options
@@ -108,8 +106,16 @@ export class FirebaseOnDeviceModel implements ModelClient {
       },
     });
 
-    this.modelCache.set(cacheKey, model);
     return model;
+  }
+
+  /** Throws unless the Prompt API is on the page right now. Must run with no await before createModel. */
+  private assertPromptApiPresent(): void {
+    if (!(globalThis as { LanguageModel?: unknown }).LanguageModel) {
+      throw createDeviceUnavailableError(
+        'Chrome Prompt API (LanguageModel) is missing; refusing the on-device call to prevent a cloud fallback.',
+      );
+    }
   }
 
   async status(): Promise<ModelStatus> {
@@ -122,7 +128,8 @@ export class FirebaseOnDeviceModel implements ModelClient {
       throw createDeviceUnavailableError(modelStatus.reason);
     }
 
-    const defaultModel = this.getModelForSchema(undefined);
+    this.assertPromptApiPresent();
+    const defaultModel = this.createModel(undefined);
 
     // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
     // "You must call initializeDeviceModel() after or on an end-user page interaction (like a button click) and before you send a prompt request to the model."
@@ -130,19 +137,16 @@ export class FirebaseOnDeviceModel implements ModelClient {
   }
 
   async generate(request: GenerateRequest): Promise<GenerateResult> {
-    // SPEC 2.2 guard: the installed SDK falls back to cloud in ONLY_ON_DEVICE mode when window.LanguageModel is absent.
-    if (typeof globalThis === 'undefined' || !('LanguageModel' in globalThis)) {
-      throw createDeviceUnavailableError(
-        'Chrome Prompt API (LanguageModel) is missing from globalThis; refusing on-device call to prevent cloud fallback.',
-      );
-    }
-
+    // SPEC 2.2 guard: the installed SDK falls back to the cloud in ONLY_ON_DEVICE mode when
+    // window.LanguageModel is absent. Check before the availability probe, and again after it with no
+    // await between the check, the model's creation and the call, so the page cannot change in between.
+    this.assertPromptApiPresent();
     const modelStatus = await probeLanguageModel();
     if (modelStatus.state === 'unavailable') {
       throw createDeviceUnavailableError(modelStatus.reason);
     }
-
-    const model = this.getModelForSchema(request.responseSchema);
+    this.assertPromptApiPresent();
+    const model = this.createModel(request.responseSchema);
 
     // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
     // "To generate text output, call generateContent with the text input: const result = await model.generateContent(prompt);"
