@@ -177,4 +177,39 @@ describe('PII Router UI', () => {
     fireEvent.click(prepareButton);
     expect(prepareCalledSynchronously).toBe(true);
   });
+
+  it('starts only one run when Run is clicked twice quickly, and freezes the mode switch while running', async () => {
+    let detectorCalls = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const slowDevice: ModelClient = {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async request => {
+        if (request.responseSchema) {
+          detectorCalls += 1;
+          await gate;
+          return { text: '{"entities":[]}', ranOn: 'device' };
+        }
+        return { text: 'Local summary output.', ranOn: 'device' };
+      },
+    };
+    render(<App liveModels={{ device: slowDevice, cloud: null, liveReason: null }} />);
+    fireEvent.change(screen.getByLabelText('Task'), { target: { value: 'summarize' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    const run = screen.getByRole('button', { name: 'Run' });
+    fireEvent.click(run);
+    fireEvent.click(run);
+    await waitFor(() => expect(detectorCalls).toBe(1));
+    expect(screen.getByRole('button', { name: 'Simulated' }).hasAttribute('disabled')).toBe(true);
+    release();
+    await screen.findByTestId('cloud-device-only-panel');
+    expect(detectorCalls).toBe(1);
+  });
 });

@@ -6,11 +6,13 @@ import { formatDeviceStatusPill } from '../ui-format';
 export interface HeaderProps {
   mode: AppMode;
   setMode: (next: AppMode) => void;
+  /** True while a run is in flight: the mode cannot change under it. */
+  locked?: boolean;
   deviceStatus: ModelStatus;
   liveReason: string | null;
 }
 
-export function Header({ mode, setMode, deviceStatus, liveReason }: HeaderProps) {
+export function Header({ mode, setMode, deviceStatus, liveReason, locked = false }: HeaderProps) {
   return (
     <header className="flex flex-col gap-3 border-b border-ink pb-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -86,7 +88,7 @@ export function Header({ mode, setMode, deviceStatus, liveReason }: HeaderProps)
         >
           <button
             type="button"
-            disabled={liveReason !== null}
+            disabled={liveReason !== null || locked}
             aria-pressed={mode === 'live'}
             onClick={() => setMode('live')}
             className={cn(
@@ -99,6 +101,7 @@ export function Header({ mode, setMode, deviceStatus, liveReason }: HeaderProps)
           </button>
           <button
             type="button"
+            disabled={locked}
             aria-pressed={mode === 'simulated'}
             onClick={() => setMode('simulated')}
             className={cn(

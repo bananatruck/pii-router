@@ -121,8 +121,12 @@ export function App({ liveModels }: AppProps = {}) {
     setSampleMenuOpen(false);
   };
 
+  // A ref, not state: two clicks in the same frame both see isRunning === false (review finding 5).
+  const runLock = useRef(false);
+
   const handleRun = async () => {
-    if (isRunning) return;
+    if (runLock.current) return;
+    runLock.current = true;
     setIsRunning(true);
     setIsEditing(false);
     setCopied(false);
@@ -139,6 +143,7 @@ export function App({ liveModels }: AppProps = {}) {
       setOutcome(result);
       await refreshStatus();
     } finally {
+      runLock.current = false;
       setIsRunning(false);
     }
   };
@@ -162,7 +167,7 @@ export function App({ liveModels }: AppProps = {}) {
       {mode === 'simulated' && <SimulatedBanner />}
 
       <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
-        <Header mode={mode} setMode={setMode} deviceStatus={deviceStatus} liveReason={liveReason} />
+        <Header mode={mode} setMode={setMode} deviceStatus={deviceStatus} liveReason={liveReason} locked={isRunning} />
 
         <Controls
           mode={mode}

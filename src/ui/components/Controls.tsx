@@ -146,6 +146,7 @@ export function Controls({
               type="checkbox"
               data-testid="simulate-nano-unavailable"
               checked={simulateNanoUnavailable}
+              disabled={isRunning}
               onChange={e => setSimulateNanoUnavailable(e.target.checked)}
               className="h-3.5 w-3.5 border-ink accent-boundary-blue"
             />
