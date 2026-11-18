@@ -34,12 +34,42 @@ describe('redaction', () => {
       { segment: 'text', type: 'PERSON', value: 'Alice Example', start: 0, end: 13, source: 'device-model' },
     ]);
     expect(result.redacted.text).toBe('[PERSON_1] [EMAIL_1]');
+    expect(result.findings.some(f => f.value === 'Alice')).toBe(false);
   });
-  it('locates every exact occurrence and ignores absent, short, or placeholder entities', () => {
+  it('keeps non-overlapping slices when a model span loses to a pattern hit', () => {
+    const text = '48 Larkspur Lane, card 4111-1111-1111-1111';
+    const whole = text;
+    const cardStart = text.indexOf('4111');
+    const result = redactSegments({ text, instruction: '' }, [
+      { segment: 'text', type: 'ADDRESS', value: whole, start: 0, end: whole.length, source: 'device-model' },
+      {
+        segment: 'text',
+        type: 'CARD',
+        value: '4111-1111-1111-1111',
+        start: cardStart,
+        end: cardStart + '4111-1111-1111-1111'.length,
+        source: 'pattern',
+      },
+    ]);
+    expect(result.redacted.text.toLowerCase()).not.toContain('larkspur');
+    expect(result.redacted.text).not.toContain('4111');
+    expect(result.redacted.text).toMatch(/\[ADDRESS_\d+\].*\[CARD_\d+\]/);
+  });
+  it('locates entities case-insensitively with flexible internal whitespace', () => {
+    const text = 'Patient Dana Whitfield';
+    expect(locateEntities(text, [{ text: 'dana  whitfield', type: 'PERSON' }])).toEqual([
+      { type: 'PERSON', value: 'Dana Whitfield', start: 8, end: 22 },
+    ]);
+  });
+  it('locates case-insensitive matches and ignores absent, short, or placeholder entities', () => {
     expect(locateEntities('Alice Alice alice', [
       { text: 'Alice', type: 'PERSON' }, { text: 'a', type: 'OTHER' },
       { text: '[EMAIL_1]', type: 'OTHER' }, { text: 'Absent', type: 'PERSON' },
-    ])).toEqual([{ type: 'PERSON', value: 'Alice', start: 0, end: 5 }, { type: 'PERSON', value: 'Alice', start: 6, end: 11 }]);
+    ])).toEqual([
+      { type: 'PERSON', value: 'Alice', start: 0, end: 5 },
+      { type: 'PERSON', value: 'Alice', start: 6, end: 11 },
+      { type: 'PERSON', value: 'alice', start: 12, end: 17 },
+    ]);
   });
   it('respects word boundaries for alphanumeric entity edges', () => {
     expect(locateEntities('Edited by Ed today. Ed, please help.', [{ text: 'Ed', type: 'PERSON' }])).toEqual([

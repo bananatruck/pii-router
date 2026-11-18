@@ -54,7 +54,42 @@ function compareCandidates(a: Candidate, b: Candidate): number {
 }
 
 function overlaps(candidate: Candidate, selected: Candidate[]): boolean {
-  return selected.some(other => other.start < candidate.end && candidate.start < other.end);
+  return selected.some(
+    other =>
+      other.segment === candidate.segment
+      && other.start < candidate.end
+      && candidate.start < other.end,
+  );
+}
+
+function uncoveredSlices(candidate: Candidate, selected: Candidate[]): Array<{ start: number; end: number }> {
+  const blocks = selected
+    .filter(
+      other =>
+        other.segment === candidate.segment
+        && other.start < candidate.end
+        && candidate.start < other.end,
+    )
+    .sort((a, b) => a.start - b.start);
+  if (!blocks.length) return [{ start: candidate.start, end: candidate.end }];
+  const slices: Array<{ start: number; end: number }> = [];
+  let cursor = candidate.start;
+  for (const block of blocks) {
+    if (cursor < block.start) slices.push({ start: cursor, end: block.start });
+    cursor = Math.max(cursor, block.end);
+  }
+  if (cursor < candidate.end) slices.push({ start: cursor, end: candidate.end });
+  return slices;
+}
+
+const PART_TRIM = /[\s,;:.]/;
+
+function trimSlice(text: string, start: number, end: number): { start: number; end: number } | null {
+  let s = start;
+  let e = end;
+  while (s < e && PART_TRIM.test(text[s] ?? '')) s += 1;
+  while (e > s && PART_TRIM.test(text[e - 1] ?? '')) e -= 1;
+  return e - s >= 2 ? { start: s, end: e } : null;
 }
 
 type RedactResult = { redacted: Record<SegmentId, string>; findings: Finding[]; vault: Vault };
@@ -72,10 +107,25 @@ export function redactSegments(segments: Record<SegmentId, string>, candidates: 
   for (const segment of ['instruction', 'text'] satisfies SegmentId[]) {
     const selected: Candidate[] = [];
     const sorted = candidates.filter(c => c.segment === segment).sort(compareCandidates);
-    for (const candidate of sorted) {
+    const pending = [...sorted];
+    for (let i = 0; i < pending.length; i += 1) {
+      const candidate = pending[i]!;
       const slice = segments[segment].slice(candidate.start, candidate.end);
       if (candidate.start < 0 || candidate.end <= candidate.start || slice !== candidate.value) continue;
-      if (!overlaps(candidate, selected)) selected.push(candidate);
+      if (!overlaps(candidate, selected)) {
+        selected.push(candidate);
+        continue;
+      }
+      for (const part of uncoveredSlices(candidate, selected)) {
+        const trimmed = trimSlice(segments[segment], part.start, part.end);
+        if (!trimmed) continue;
+        pending.push({
+          ...candidate,
+          start: trimmed.start,
+          end: trimmed.end,
+          value: segments[segment].slice(trimmed.start, trimmed.end),
+        });
+      }
     }
     let cursor = 0;
     let result = '';
@@ -104,18 +154,31 @@ export function redactSegments(segments: Record<SegmentId, string>, candidates: 
   return { redacted, findings, vault: { entries } };
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function flexibleEntityPattern(entityText: string): RegExp {
+  const parts = entityText.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return /$^/;
+  const body = parts.map(escapeRegExp).join('\\s+');
+  return new RegExp(body, 'giu');
+}
+
 export function locateEntities(text: string, entities: Array<{ text: string; type: PiiType }>): LocatedEntity[] {
   const hits: LocatedEntity[] = [];
   const expanded = [...entities, ...entities.flatMap(personNameParts)];
   for (const entity of expanded) {
     if (entity.text.length < 2 || onlyPlaceholder.test(entity.text)) continue;
-    let start = text.indexOf(entity.text);
-    while (start !== -1) {
-      const end = start + entity.text.length;
+    const regex = flexibleEntityPattern(entity.text);
+    for (const match of text.matchAll(regex)) {
+      const start = match.index;
+      if (start === undefined) continue;
+      const value = text.slice(start, start + match[0].length);
+      const end = start + value.length;
       if (hasAlphanumericWordBoundary(text, start, end)) {
-        hits.push({ type: entity.type, value: entity.text, start, end });
+        hits.push({ type: entity.type, value, start, end });
       }
-      start = text.indexOf(entity.text, start + 1);
     }
   }
   return hits;
