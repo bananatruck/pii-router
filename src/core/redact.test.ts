@@ -41,6 +41,19 @@ describe('redaction', () => {
       { text: '[EMAIL_1]', type: 'OTHER' }, { text: 'Absent', type: 'PERSON' },
     ])).toEqual([{ type: 'PERSON', value: 'Alice', start: 0, end: 5 }, { type: 'PERSON', value: 'Alice', start: 6, end: 11 }]);
   });
+  it('respects word boundaries for alphanumeric entity edges', () => {
+    expect(locateEntities('Edited by Ed today. Ed, please help.', [{ text: 'Ed', type: 'PERSON' }])).toEqual([
+      { type: 'PERSON', value: 'Ed', start: 10, end: 12 },
+      { type: 'PERSON', value: 'Ed', start: 20, end: 22 },
+    ]);
+  });
+  it('locates name parts from multi-word PERSON entities', () => {
+    const text = 'Dana Whitfield wrote. Later, Dana called again about Whitfield\'s order.';
+    const hits = locateEntities(text, [{ text: 'Dana Whitfield', type: 'PERSON' }]);
+    expect(hits.filter(h => h.value === 'Dana').map(h => h.start)).toEqual([0, 29]);
+    expect(hits.filter(h => h.value === 'Whitfield').map(h => h.start)).toEqual([5, 53]);
+    expect(hits.some(h => h.value === 'Dana Whitfield')).toBe(true);
+  });
   it('restores tolerant spellings once without recursively restoring values', () => {
     const result = redact('alice@example.com 202-555-0100');
     for (const token of ['[email_1]', '[ EMAIL_1 ]', '[EMAIL 1]', '[EMAIL-1]']) {

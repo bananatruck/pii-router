@@ -17,6 +17,16 @@ describe('routing', () => {
     expect(chooseRoute({ ...input, preference: 'device' }, true)).toBe('device-only');
     expect(chooseRoute({ ...base, text: 'x'.repeat(DEVICE_CHAR_BUDGET) }, true)).toBe('device-only');
   });
+  it('redacts every name part before a cloud request', async () => {
+    const text = 'Dana Whitfield wrote. Later, Dana called again about Whitfield\'s order.';
+    const device = new RecordingModel(new FakeModel({ location: 'device' }));
+    const cloud = new RecordingModel(new FakeModel({ location: 'cloud' }));
+    const result = await runPipeline({ ...base, text, task: 'rewrite', preference: 'cloud' }, { device, cloud });
+    expect(result.kind).toBe('answered');
+    const payload = cloud.requests[0]?.prompt ?? '';
+    expect(payload.toLowerCase()).not.toContain('dana');
+    expect(payload.toLowerCase()).not.toContain('whitfield');
+  });
   it('passes originals only to local answering, records safe trace, and never calls cloud', async () => {
     const device = new RecordingModel(new FakeModel({ location: 'device' }));
     const cloud = new RecordingModel(new FakeModel({ location: 'cloud' }));
