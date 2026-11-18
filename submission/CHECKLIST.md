@@ -6,7 +6,7 @@ Each step names the rule that drives it, quoted from https://firebasehybridaihac
 
 ## Left for you
 
-- [ ] **Firebase project, real run (about 30 minutes).** Follow `submission/SETUP_FOR_KESH.md` steps 1 to 6, commit the filled-in `src/firebase-config.ts`, and push.
+- [ ] **Firebase project, real run (about 30 minutes).** Start with `pnpm verify:setup`, then follow `submission/SETUP_FOR_KESH.md` steps 1 to 6, commit the filled-in `src/firebase-config.ts`, and push.
   Rule: the repository "must demonstrate the use of Firebase AI Logic at runtime in your code - imported and actually called"; the code already does this, and the real run proves it works.
   Rule: "Firebase AI Logic requires App Check; debug tokens are accepted in submissions."
   Do not commit the debug token: "Entrants must not include production API keys, live Google Cloud project secrets ... within their repository".

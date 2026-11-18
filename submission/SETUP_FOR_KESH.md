@@ -1,11 +1,20 @@
 # Setup for Kesh: connect a real Firebase project and Gemini Nano
 
-This takes about 30 minutes, most of it waiting for the Gemini Nano download.
+This takes about 30 minutes of your time; the Gemini Nano download runs in the background.
 Every step names the page it comes from.
 Nothing here costs money: the Gemini Developer API provider is used at no cost within its limits, and Gemini Nano runs on your machine.
+Work in `~/Documents/Projects/hackathons/pii-router` (Node 22 or later and pnpm; `node_modules` is already installed there).
+
+## Fast path
+
+1. Run `pnpm verify:setup`. On 2026-11-18 it reported two blockers: the placeholder config, and 6.4 GB free on the volume with your Chrome profile (Flatpak Chrome, `~/.var/app/com.google.Chrome`), where Chrome needs at least 22 GB free before it downloads Gemini Nano. Free about 16 GB first.
+2. Start the Gemini Nano download early (step 5), because it is the long wait.
+3. Do steps 1 to 4 while it downloads.
+4. Run `pnpm verify:setup` again until it says "ready for the real run". It checks the pasted config offline (it never prints the API key and makes no network request), checks that no App Check debug token was committed, re-checks the disk, and lists the `[VERIFY AFTER REAL RUN]` markers in `submission/DEVPOST.md` with the step that settles each.
+5. Do step 6 and update those markers with what you saw.
 
 You need: a Google account, desktop Chrome 139 or later, and a machine that meets the Prompt API hardware requirements (step 5).
-This laptop (G14, 16 GB RAM) meets the RAM rule, but the disk had under 9 GB free tonight and Chrome needs at least 22 GB free on the profile volume before it will download Gemini Nano.
+This laptop (G14, 16 GB RAM) meets the RAM rule; free disk is the problem.
 
 ## 1. Create the Firebase project
 
@@ -29,7 +38,7 @@ Same doc, Step 2.
 Doc: https://firebase.google.com/docs/web/learn-more#config-object
 
 1. If step 2 did not register an app: Project settings > General > Your apps > Add app > Web. Name it `pii-router-web`. Hosting is not needed.
-2. Copy the `firebaseConfig` values into `src/firebase-config.ts`, replacing every `PLACEHOLDER_...` value.
+2. Copy the `firebaseConfig` values into `src/firebase-config.ts`, replacing every `PLACEHOLDER_...` value, then run `pnpm verify:setup`.
    The web config identifies the project and is not a secret, so it can be committed.
 3. Leave `recaptchaEnterpriseSiteKey` as the placeholder for local testing.
    The App Check SDK still loads the reCAPTCHA Enterprise script with that placeholder key, even though the debug token is what authenticates on localhost; I could not run this, so watch the console in step 4 and note any reCAPTCHA errors.
@@ -39,7 +48,7 @@ Doc: https://firebase.google.com/docs/web/learn-more#config-object
 Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 4) and https://firebase.google.com/docs/app-check/web/debug-provider.
 
 1. In the console, open Security > App Check > APIs and check that the row for Firebase AI Logic says Enforced.
-2. Run the app locally: `pnpm install` then `pnpm dev`, and open `http://localhost:5173`.
+2. Run the app locally with `pnpm dev` and open `http://localhost:5173` (it must be `localhost` or `127.0.0.1` in a development build for the debug provider to switch on).
    In a development build on localhost the app sets `self.FIREBASE_APPCHECK_DEBUG_TOKEN = true` before `initializeAppCheck`, as the doc says.
 3. Open DevTools > Console and copy the line `Firebase App Check debug token: ...`.
    The SDK prints it only when it creates a new token on the first load; if you miss it, clear the site data for localhost (DevTools > Application > Storage > Clear site data) and reload.
@@ -51,7 +60,7 @@ Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 4) 
 Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 1) and https://developer.chrome.com/docs/ai/prompt-api (hardware requirements).
 
 1. Check `chrome://settings/help` shows version 139 or later.
-2. Open `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input`, set it to Enabled, and restart Chrome.
+2. Open `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input`, set it to Enabled, and restart Chrome (on this laptop Chrome is the Flatpak `com.google.Chrome`; the flag page is the same).
 3. Hardware, from the Prompt API page: Windows 10 or 11, macOS 13+, or Linux; at least 22 GB free on the volume with your Chrome profile; a GPU with more than 4 GB of VRAM, or 16 GB of RAM and 4 CPU cores; an unmetered connection for the download.
 4. Optional, to download ahead of time: on `http://localhost:5173`, open DevTools > Console and run `await LanguageModel.availability();`.
    If it prints `downloadable`, run `await LanguageModel.create();` and wait.
@@ -69,7 +78,7 @@ Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 1) 
    It must contain the placeholders and none of the sample's name, email, phone or card number.
    Also check that no request to that host was made during the Gemini Nano step.
 5. Switch the task to "Summarize": with Gemini Nano ready, Auto keeps it on the device, and the Network tab must show no `firebasevertexai` request at all.
-6. Fail-closed check: set the Chrome flag back to Default, restart, reload, and run the rewrite again.
+6. Fail-closed check: set the Chrome flag to Disabled (not Default, which may still leave the API on), restart, reload, and run the rewrite again.
    The app must say it is blocked because Gemini Nano is unavailable, and the Network tab must show no `generateContent` request.
    Turn the flag back on afterwards.
 7. Write down what you saw; `submission/CHECKLIST.md` has a line for it.

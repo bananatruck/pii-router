@@ -112,7 +112,7 @@ pnpm dev
 Open `http://localhost:5173`.
 With the placeholder config the app starts in Simulated mode.
 
-To use the real models, follow [submission/SETUP_FOR_KESH.md](submission/SETUP_FOR_KESH.md): create a Firebase project with Firebase AI Logic (Gemini Developer API), paste the web config into `src/firebase-config.ts`, register the App Check debug token, and enable Gemini Nano in desktop Chrome 139 or later.
+To use the real models, follow [submission/SETUP_FOR_KESH.md](submission/SETUP_FOR_KESH.md) and run `pnpm verify:setup` to check the pasted config offline: create a Firebase project with Firebase AI Logic (Gemini Developer API), paste the web config into `src/firebase-config.ts`, register the App Check debug token, and enable Gemini Nano in desktop Chrome 139 or later.
 
 ## Checks
 
