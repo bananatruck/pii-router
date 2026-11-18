@@ -9,13 +9,16 @@ The hosted demo runs in a clearly labelled "Simulated" mode: a deterministic sta
 The real hybrid path (Gemini Nano plus Gemini in the cloud through Firebase AI Logic) is in this repository and runs locally once a Firebase project is connected; it is not deployed yet because the Firebase project does not exist yet.
 See [Status](#status).
 
+> **Status, plainly:** as of 2026-11-18 the real path has not been run against a live Firebase project or a downloaded Gemini Nano.
+> Every screenshot and the hosted demo show the simulated mode; the Firebase AI Logic code is unit-tested with the SDK mocked, and its on-device guard is tested against the real SDK.
+
+All screenshots show the simulated demo mode, as its banner says; they were taken by `pnpm e2e` in Playwright's Chromium.
+
 ![PII Router running the sample support email: personal values marked on the device side, placeholders on the cloud side, the restored answer on the device](docs/screenshots/desktop-cloud-run.png)
 
 | A light task stays on the device | Gemini Nano unavailable: nothing is sent | Phone |
 |---|---|---|
 | ![Summary answered on the device; the cloud column says nothing left this device](docs/screenshots/desktop-device-only.png) | ![The rewrite is blocked because Gemini Nano is unavailable](docs/screenshots/desktop-blocked.png) | ![The same flow at phone width](docs/screenshots/phone-cloud-run.png) |
-
-All screenshots show the simulated demo mode, as its banner says; they were taken by `pnpm e2e` in Playwright's Chromium.
 
 ## The problem
 

@@ -2,10 +2,11 @@
 
 Every field of the Devpost form, drafted in my voice.
 Paste each block into the matching field.
-Two kinds of markers are left for the real run:
+Three kinds of markers are left for you:
 
 - `[VERIFY AFTER REAL RUN]`: a sentence about the real Firebase and Gemini Nano path that was built and unit-tested but could not be run on the build machine; keep it only if the real run in `SETUP_FOR_KESH.md` step 6 shows it, otherwise delete or correct it.
 - `[LINK]`: a URL that only exists after you create it (the YouTube video).
+- `[KESH TO CONFIRM]`: a first-person sentence drafted in your voice; keep it only if it is true for you.
 
 What was verified overnight, and how, is listed at the end of this file so you can check each claim.
 
@@ -57,6 +58,7 @@ If the app cannot verify the text on the device, it sends nothing and tells you 
 The app is a Vite, React and TypeScript web app for desktop Chrome, using the Firebase JS SDK 13.4.0 (`firebase/ai`).
 All model access goes through one small interface with three implementations: Gemini Nano through Firebase AI Logic, Gemini in the cloud through Firebase AI Logic, and a deterministic fake used by the tests and by the labelled demo mode.
 Firebase AI Logic is imported and called at runtime in `src/models/firebase-on-device.ts` and `src/models/firebase-cloud.ts`, with App Check initialised first in `src/models/firebase-app.ts` (the reCAPTCHA Enterprise provider, with the debug-token flag set first on localhost development builds so App Check uses a debug token there).
+[VERIFY AFTER REAL RUN] Status when this was drafted: these calls are unit-tested with the SDK mocked and the on-device guard is tested against the real SDK, but they have not yet run against a live Firebase project or a downloaded Gemini Nano; after the real run, replace this sentence with what it showed.
 The on-device detector uses structured output: the same JSON schema goes to `onDeviceParams.promptOptions.responseConstraint`, and anything that does not parse is rejected.
 `response.inferenceSource` is checked on every on-device call, and a cloud source blocks the run.
 The privacy promise is enforced by tests rather than by trust: a recording cloud model captures the exact string it receives, and for 28 synthetic inputs across every task, no detected value appears in it.

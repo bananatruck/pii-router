@@ -16,8 +16,11 @@ describe('PII Router UI', () => {
     render(<App />);
     const banner = screen.getByTestId('simulated-banner');
     expect(banner.textContent).toBe(
-      'Simulated demo. No model is running: a deterministic stand-in plays both Gemini Nano and the cloud model so you can see the flow. Results are not model output.',
+      'Simulated demo. No model is running: a deterministic stand-in plays both Gemini Nano and the cloud model so you can see the flow. Results are not model output. '
+        + 'The real Firebase AI Logic path has not been run against a live Firebase project or Gemini Nano yet. How to run it for real',
     );
+    const link = screen.getByRole('link', { name: 'How to run it for real' });
+    expect(link.getAttribute('href')).toBe('https://github.com/bananatruck/pii-router#run-it-locally');
   });
 
   it('disables the Live mode button and displays the reason when liveReason is not null', () => {
