@@ -1,4 +1,4 @@
-import { PLACEHOLDER_SOURCE } from './redact';
+import { simulatedCloudReply } from './fake-cloud-replies';
 import type { GenerateRequest, GenerateResult, ModelClient, ModelLocation, ModelStatus } from './types';
 
 export type FakeBehaviour = 'ok' | 'unavailable' | 'needs-download' | 'throws' | 'bad-json' | 'wrong-source';
@@ -13,14 +13,6 @@ export const DEMO_GIVEN_NAMES = [
 
 const ADDRESS_PATTERN =
   /\b\d{1,6} (?:[A-Z][a-z]+ ){1,5}(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|Drive|Dr|Boulevard|Blvd)\b/g;
-
-function cloudReplyPrefix(prompt: string): string {
-  if (prompt.includes('Task: Draft a reply')) {
-    return 'Thank you for your message. I will review the details for';
-  }
-  if (prompt.includes('Task: Rewrite')) return 'Please review the following details:';
-  return 'The text concerns';
-}
 
 export class FakeModel implements ModelClient {
   readonly simulated = true;
@@ -60,10 +52,7 @@ export class FakeModel implements ModelClient {
     } else if (this.location === 'device') {
       text = (content.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [content]).slice(0, 2).join('').trim();
     } else {
-      const placeholderRegex = new RegExp(PLACEHOLDER_SOURCE, 'gi');
-      const placeholders = [...new Set([...request.prompt.matchAll(placeholderRegex)].map(m => m[0]))];
-      const prefix = cloudReplyPrefix(request.prompt);
-      text = `${prefix} ${placeholders.join(', ') || 'the requested matter'}.`;
+      text = simulatedCloudReply(request.prompt);
     }
     return { text, ranOn };
   }

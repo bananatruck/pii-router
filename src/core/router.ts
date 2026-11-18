@@ -88,6 +88,7 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
   step('patterns', true, `${candidates.length} pattern findings.`, start);
   let ready = false;
   let detectorFailure: BlockReason | null = null;
+  const reportedByDevice = new Set<string>();
   start = now();
   try {
     ready = deps.device.location === 'device' && (await deps.device.status()).state === 'ready';
@@ -102,18 +103,25 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
         if (!localResult(result)) { detectorFailure = 'detector-wrong-source'; break; }
         const parsed = parseDetectorOutput(result.text);
         if (!parsed.ok) { detectorFailure = 'detector-bad-output'; break; }
+        for (const entity of parsed.entities) reportedByDevice.add(entity.text);
         for (const entity of locateEntities(segments[segment], parsed.entities)) {
           candidates.push({ ...entity, segment, source: 'device-model' });
         }
       }
     }
   } catch { detectorFailure = 'detector-failed'; }
-  const modelCount = candidates.filter(c => c.source === 'device-model').length;
-  const detectorNote = detectorFailure ? 'Local detection could not be verified.' : `${modelCount} model findings.`;
-  step('device-detector', detectorFailure === null, detectorNote, start);
+  const detectorStart = start;
   start = now();
   redaction = redactSegments(segments, candidates);
   trace.findings = redaction.findings;
+  // Count values the device model itself reported that became findings: not repeats, not name
+  // parts we derived, and not strings that lost to a pattern match or were absent from the text.
+  const kept = new Set(trace.findings.filter(f => f.source === 'device-model').map(f => f.value));
+  const deviceValues = [...reportedByDevice].filter(value => kept.has(value)).length;
+  const detectorNote = detectorFailure
+    ? 'Local detection could not be verified.'
+    : `${deviceValues} ${deviceValues === 1 ? 'value' : 'values'} found on the device.`;
+  step('device-detector', detectorFailure === null, detectorNote, detectorStart);
   trace.redactedText = redaction.redacted.text;
   step('redact', true, `${trace.findings.length} findings replaced.`, start);
   start = now();

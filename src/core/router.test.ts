@@ -27,6 +27,49 @@ describe('routing', () => {
     expect(payload.toLowerCase()).not.toContain('dana');
     expect(payload.toLowerCase()).not.toContain('whitfield');
   });
+  it('counts distinct reported device values across repeats, name parts and segments', async () => {
+    const result = await runPipeline({
+      text: 'Dana Whitfield wrote. Dana Whitfield called Dana at 14 Maple Street.',
+      task: 'custom', preference: 'cloud',
+      customInstruction: 'Help Dana Whitfield at 14 Maple Street.',
+    }, { device: new FakeModel({ location: 'device' }), cloud: new FakeModel({ location: 'cloud' }) });
+    expect(result.kind).toBe('answered');
+    expect(result.trace.steps.find(step => step.id === 'device-detector')).toMatchObject({ ok: true, note: '2 values found on the device.' });
+    expect(result.trace.findings.some(finding => finding.value === 'Dana')).toBe(true);
+    for (const step of result.trace.steps) {
+      for (const finding of result.trace.findings) expect(step.note).not.toContain(finding.value);
+    }
+  });
+  it('counts only device-reported values that survive finding selection', async () => {
+    const fake = new FakeModel({ location: 'device' });
+    const device: ModelClient = {
+      location: 'device', simulated: true, label: fake.label,
+      status: () => fake.status(), prepare: () => fake.prepare(),
+      generate: async () => ({ text: JSON.stringify({ entities: [
+        { text: 'Dana Whitfield', type: 'PERSON' },
+        { text: 'Whitfield', type: 'OTHER' },
+        { text: 'Missing Example', type: 'PERSON' },
+        { text: 'example.com', type: 'OTHER' },
+      ] }), ranOn: 'simulated' }),
+    };
+    const result = await runPipeline({ ...base, text: 'Dana Whitfield at alice@example.com.', preference: 'cloud' }, { device, cloud: new FakeModel({ location: 'cloud' }) });
+    expect(result.kind).toBe('answered');
+    expect(result.trace.steps.find(step => step.id === 'device-detector')?.note).toBe('1 value found on the device.');
+  });
+  it('reports zero device values when only patterns matched', async () => {
+    const result = await runPipeline({ ...base, text: 'Email contact@example.com.' }, { device: new FakeModel({ location: 'device' }), cloud: null });
+    expect(result.trace.steps.find(step => step.id === 'device-detector')?.note).toBe('0 values found on the device.');
+  });
+  it('restores synthetic values within the simulated professional rewrite', async () => {
+    const result = await runPipeline({ ...base, task: 'rewrite', text: "Hi support, I'd like help. Contact alice@example.com. Thanks, Alice Example." }, {
+      device: new FakeModel({ location: 'device' }), cloud: new FakeModel({ location: 'cloud' }),
+    });
+    expect(result).toMatchObject({
+      kind: 'answered', route: 'cloud-redacted', unresolvedPlaceholders: [],
+      answer: 'Hello,\n\nI would like help. Contact alice@example.com. Thank you, Alice Example.\n\nKind regards,\nAlice Example',
+    });
+    expect(result.trace.cloudReply).toBe('Hello,\n\nI would like help. Contact [EMAIL_1]. Thank you, [PERSON_1].\n\nKind regards,\n[PERSON_1]');
+  });
   it('passes originals only to local answering, records safe trace, and never calls cloud', async () => {
     const device = new RecordingModel(new FakeModel({ location: 'device' }));
     const cloud = new RecordingModel(new FakeModel({ location: 'cloud' }));
