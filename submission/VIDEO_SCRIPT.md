@@ -18,11 +18,12 @@ Do not show the App Check debug token or the Firebase console's API key area.
 | 1:25-1:45 | The answer panel: the cloud's reply with placeholders resolves into the restored text, the real name and email fading back in. | "The cloud writes the polished reply around the placeholders, and the device puts the real values back. The cloud never saw them." |
 | 1:45-2:05 | Switch the task to "Summarize", click "Run". The right pane reads "Nothing left this device"; the Network tab stays empty. | "For light work, Auto keeps the whole task on Gemini Nano. Where the work runs is decided by what the text contains and how heavy the task is." |
 | 2:05-2:30 | Show the fail-closed state recorded earlier with Gemini Nano disabled: the red "Blocked" message and an empty Network tab. | "Here's the important part. The common hybrid mode, PREFER_ON_DEVICE, silently falls back to the cloud. And reading the SDK source, I found that even ONLY_ON_DEVICE goes to the cloud when the browser has no Prompt API at all. So PII Router checks first, and when it can't verify the text on the device, it sends nothing and tells you why." |
-| 2:30-2:40 | The "What it catches / What it can miss" section, then the repo URL. | "It's honest about its limits, it's open source under Apache 2.0, and every privacy claim is backed by a test on the exact outbound payload." |
+| 2:30-2:40 | The "What it catches / What it can miss" section, then the repo URL. | "It's honest about its limits, it's open source under Apache 2.0, and its privacy claims are backed by tests on the exact outbound payload." |
 
 ## Recording notes
 
 - Before recording, run `submission/SETUP_FOR_KESH.md` step 6 once so Gemini Nano is downloaded and the debug token is registered.
-- For the 2:05 shot, record it separately: set `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input` to Default, restart Chrome, run the rewrite, then turn the flag back on.
-- Add English captions in YouTube Studio (auto-captions plus a quick correction pass is enough).
+- For the 2:05 shot, record it separately: set `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input` to Disabled, restart Chrome, run the rewrite, then turn the flag back on.
+- `pnpm record:demo` records this walk-through with captions and writes an `.srt` (see `docs/RECORDING.md`); upload the `.srt` in YouTube Studio as the English captions.
+- `submission/video/demo-simulated-take.mp4` (local, not committed) is a take of the simulated demo, made on 2026-11-18 so the flow and captions can be checked; it is not the submission video, because the rules require that the project "must function as depicted in the video" and the submission describes the real hybrid path.
 - Title suggestion: "PII Router: Gemini Nano redacts on-device, Gemini in the cloud does the heavy lifting (#BuildHybridAI)".
