@@ -23,6 +23,8 @@ export interface UseModelsResult {
   deviceStatus: ModelStatus;
   prepareDevice: () => void;
   refreshStatus: () => Promise<ModelStatus>;
+  simulateNanoUnavailable: boolean;
+  setSimulateNanoUnavailable: (next: boolean) => void;
 }
 
 export function useModels(options?: UseModelsOptions): UseModelsResult {
@@ -31,12 +33,16 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
     [options?.liveModels],
   );
 
+  const [simulateNanoUnavailable, setSimulateNanoUnavailable] = useState(false);
+
   const simulated = useMemo(
     () => ({
-      device: new FakeModel({ location: 'device', latencyMs: 350 }),
+      device: simulateNanoUnavailable
+        ? new FakeModel({ location: 'device', behaviour: 'unavailable', latencyMs: 350 })
+        : new FakeModel({ location: 'device', latencyMs: 350 }),
       cloud: new FakeModel({ location: 'cloud', latencyMs: 700 }),
     }),
-    [],
+    [simulateNanoUnavailable],
   );
 
   const [mode, setModeState] = useState<AppMode>(() =>
@@ -133,5 +139,7 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
     deviceStatus,
     prepareDevice,
     refreshStatus,
+    simulateNanoUnavailable,
+    setSimulateNanoUnavailable,
   };
 }

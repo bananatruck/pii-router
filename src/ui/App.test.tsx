@@ -110,6 +110,45 @@ describe('PII Router UI', () => {
     expect(screen.getByTestId('cloud-blocked-panel').textContent).toContain('Nothing was sent.');
   });
 
+  it('shows one findings list row per placeholder for the support email sample', async () => {
+    vi.useFakeTimers();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Use sample/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await vi.advanceTimersByTimeAsync(1500);
+
+    const list = screen.getByTestId('findings-list');
+    const rows = list.querySelectorAll('li');
+    const placeholderKeys = [...rows].map(row => row.textContent?.match(/\[[\w_]+\]/)?.[0]);
+    expect(placeholderKeys.length).toBe(new Set(placeholderKeys).size);
+    const listText = list.textContent ?? '';
+    expect(listText).toContain('[EMAIL_1]');
+    expect(listText).toContain('[PHONE_1]');
+    expect(listText).toContain('[CARD_1]');
+  });
+
+  it('blocks the rewrite task with Nothing was sent when simulate nano unavailable is on', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('simulate-nano-unavailable'));
+    await waitFor(() => {
+      const pill = screen.getByTestId('status-nano').textContent ?? '';
+      expect(pill).toContain('Gemini Nano: unavailable');
+      expect(pill).toContain('(simulated)');
+    });
+
+    const taskSelect = screen.getByLabelText('Task') as HTMLSelectElement;
+    fireEvent.change(taskSelect, { target: { value: 'rewrite' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('outcome-blocked').textContent).toContain('Blocked');
+    });
+    expect(screen.getByTestId('cloud-blocked-panel').textContent).toContain('Nothing was sent.');
+  });
+
   it('keeps everything on the device for device-only route and calls device.prepare directly on click when needs-download', async () => {
     let prepareCalledSynchronously = false;
     const downloadableDevice: ModelClient = {
