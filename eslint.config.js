@@ -20,7 +20,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['e2e/**/*.mjs', '*.config.{js,ts}'],
+    files: ['e2e/**/*.mjs'],
+    extends: [js.configs.recommended],
+    // Node scripts that also pass callbacks into page.evaluate(), which run in the browser.
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    files: ['*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
   },
 );
