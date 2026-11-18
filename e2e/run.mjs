@@ -89,6 +89,10 @@ async function checkViewport(browser, viewport) {
     fail(`${viewport.name}: egress guard status`);
   }
   await page.waitForTimeout(2500); // let the reveal animations finish before the screenshot
+  // The simulated label must stay on screen wherever output is shown, including after scrolling.
+  await page.getByTestId('restored-answer').scrollIntoViewIfNeeded();
+  const bannerBox = await page.getByTestId('simulated-banner').boundingBox();
+  if (!bannerBox || bannerBox.y < 0 || bannerBox.y > 5) fail(`${viewport.name}: simulated banner scrolled out of view`);
   const answer = await page.getByTestId('restored-answer').innerText();
   if (!answer.includes('Dana Whitfield')) fail(`${viewport.name}: restored answer lacks the restored name`);
   if (!REMOTE) await page.screenshot({ path: new URL(`${viewport.name}-cloud-run.png`, SHOTS).pathname, fullPage: true });

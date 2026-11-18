@@ -8,7 +8,7 @@ export function SimulatedBanner() {
     <div
       role="status"
       data-testid="simulated-banner"
-      className="border-b border-ink bg-marker-amber px-4 py-2.5 text-sm font-medium text-ink"
+      className="sticky top-0 z-40 border-b border-ink bg-marker-amber px-4 py-2.5 text-sm font-medium text-ink"
     >
       <div className="mx-auto flex max-w-[1400px] items-start gap-2">
         <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
