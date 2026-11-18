@@ -19,5 +19,5 @@
     "noEmit": true,
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src"]
+  "include": ["src", "e2e/**/*.ts"]
 }
