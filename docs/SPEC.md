@@ -1,0 +1,229 @@
+# PII Router - specification
+
+PII Router is a web app for Chrome.
+You paste text that contains personal data, pick a task, and it decides where the work may run.
+Gemini Nano on your device finds and removes the personal data, only the redacted text goes to the cloud model, and the original values are put back into the answer on your device.
+Where inference runs is decided by privacy, not only by capability.
+
+This file is the contract for everyone who works on the code, human or agent.
+Where it cites documentation, the cited page is the source of truth, read on 2026-11-17.
+
+## 1. The hackathon, as read
+
+Source pages (read live on 2026-11-17; byte-identical in content to the saved copies under `~/overnight-2026-11-17/hackathons/raw/`):
+`https://firebasehybridaihackathon.devpost.com/`, `/rules` and `/resources`.
+
+### 1.1 What must be built
+
+The project must be a Gen AI app that uses the Firebase AI Logic Hybrid Inference SDK.
+For the Web (Chrome) platform that means Gemini Nano 4 through Firebase AI Logic, in "Web applications or Chrome extensions".
+"Firebase AI Logic requires App Check; debug tokens are accepted in submissions."
+Other Firebase products (Remote Config, Firestore, Authentication) are encouraged, not required.
+The project must install and run consistently on its platform and must work as shown in the video and the description.
+New projects are eligible; "AI coding assistants" are listed as allowed standard tools, and any other pre-existing code or work must be disclosed.
+
+### 1.2 What must be submitted
+
+- A platform selection (we select Web).
+- A text description covering how Firebase AI Logic is used, the features, and the value proposition.
+- A public GitHub or GitLab repository with all source, assets and instructions, that "must demonstrate the use of Firebase AI Logic at runtime in your code - imported and actually called".
+- An open source license file, visible in the repository's About section; "Apache is preferred".
+- A demo video of at most 3 minutes, public on YouTube, in English or with English subtitles, showing the project working on its platform.
+- Strongly encouraged: a URL where judges can try the project; "a hosted project is highly encouraged".
+- The project must be free for judges to use until the judging period ends.
+- The repository, form and testing instructions must not contain production API keys, live Google Cloud project secrets, or personally identifiable information.
+
+### 1.3 Judging
+
+Stage one is pass or fail on the submission requirements.
+Stage two scores four equally weighted criteria from 1 to 5:
+
+- Technological Implementation: how well it is built and how effectively it uses Firebase AI Logic hybrid inference.
+- Design: a complete, coherent product experience, not a technical proof of concept.
+- Potential Impact: a credible, specific case for a real problem and a real audience, judged on what is demonstrated.
+- Quality of the Idea: a creative, non-obvious use of Firebase AI Logic, with genuine understanding of the problem space.
+
+Ties are broken on the criteria in that order.
+A project can win the Grand Prize and at most one "Best of" prize; we target Best Web/Chrome App.
+
+### 1.4 How this design answers the criteria
+
+- Technological Implementation: both inference modes that matter are used on purpose (`ONLY_ON_DEVICE` for anything that sees raw text, `ONLY_IN_CLOUD` for redacted text), the SDK's `inferenceSource` is checked, and the privacy guarantee is enforced by tests on the exact outbound payload.
+- Design: one screen shows, live, what stayed on the device and what crossed to the cloud, character for character.
+- Potential Impact: people paste customer emails, medical notes and HR text into cloud chatbots every day; this lets them use a strong cloud model without handing over the personal details.
+- Quality of the Idea: the documented hybrid pattern is "on-device when available, cloud otherwise"; here the split is decided by what the text contains, and the on-device model acts as the privacy gate for the cloud model.
+
+### 1.5 Decision: web app, not a Chrome extension
+
+I build a web app (Vite, React, TypeScript) that runs in desktop Chrome.
+The rules allow either form.
+I rejected the Manifest V3 extension because the hosted URL is "highly encouraged", because the Firebase hybrid guide is written for web apps on `localhost` and hosted origins, and because the only production App Check provider for Web named in the docs is reCAPTCHA Enterprise, which is bound to web domains (https://firebase.google.com/docs/ai-logic/production-checklist).
+A static build can be hosted on GitHub Pages in simulated mode tonight, and on Firebase Hosting or Pages with real models once the Firebase project exists.
+
+## 2. Platform facts this design depends on
+
+Each line names the page it comes from.
+
+- On-device inference through Firebase AI Logic needs SDK v12.5.0 or later and Chrome on Desktop 139 or later (https://firebase.google.com/docs/ai-logic/hybrid/web/get-started).
+- On-device inference uses Chrome's Prompt API (same page).
+- The flag `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input` must be Enabled, then Chrome restarted (same page).
+- `getAI(firebaseApp, { backend: new GoogleAIBackend() })` and `getGenerativeModel(ai, { mode: InferenceMode.X })` from `firebase/ai` (same page).
+- Modes, quoted: `PREFER_ON_DEVICE` "Use the on-device model if it's available; otherwise, fall back to the cloud-hosted model"; `ONLY_ON_DEVICE` "Use the on-device model if it's available; otherwise, throw an exception"; `PREFER_IN_CLOUD`; `ONLY_IN_CLOUD` "Use the cloud-hosted model if it's available; otherwise, throw an exception" (https://firebase.google.com/docs/ai-logic/hybrid/web/configuration-options).
+- `result.response.inferenceSource` is `ON_DEVICE` or `IN_CLOUD`, from JS SDK v12.5.0 (same page).
+- `inCloudParams: { model, generationConfig }` and `onDeviceParams: { createOptions: { expectedInputs, expectedOutputs, initialPrompts } }` (same page).
+- The default cloud model is `gemini-3.5-flash-lite` from JS SDK v13.0.0 (same page).
+- Structured output on device: `onDeviceParams.promptOptions.responseConstraint` with a `Schema` or plain JSON schema; in the cloud: `inCloudParams.generationConfig.responseMimeType: "application/json"` and `responseSchema` (https://firebase.google.com/docs/ai-logic/hybrid/web/generate-structured-output).
+- `model.initializeDeviceModel(progressCallback)` must be called "after or on an end-user page interaction" and "before any queries to the model" (https://firebase.google.com/docs/ai-logic/hybrid/web/get-started).
+- With `ONLY_ON_DEVICE`, a request made before the download finishes waits for the download (same page).
+- On device the token limit is 9216, and only single-turn text generation is supported, not chat (same page).
+- App Check is enforced for Firebase AI Logic in all projects since November 2, 2026 (banner on the same page and the production checklist).
+- Debug provider: set `self.FIREBASE_APPCHECK_DEBUG_TOKEN = true` before `initializeAppCheck`, read the token from the console, register it under Security > App Check > Apps > Manage debug tokens; never commit it (https://firebase.google.com/docs/app-check/web/debug-provider).
+- Production web provider: `initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(KEY), isTokenAutoRefreshEnabled: true })` (https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider).
+- Prompt API hardware: Windows 10 or 11, macOS 13+, Linux or Chromebook Plus; at least 22 GB free on the Chrome profile volume; a GPU with more than 4 GB VRAM, or 16 GB RAM and 4 cores (https://developer.chrome.com/docs/ai/prompt-api).
+- `LanguageModel.availability(options)` returns `unavailable`, `downloadable`, `downloading` or `available`; pass the same options as the prompt (same page).
+- Chrome's own guidance: "When you fallback to the cloud, there may be legal or functional consequences for your application. If you process sensitive information, be sure to make the appropriate terms and conditions available for user review and consent" (https://developer.chrome.com/docs/ai/firebase-ai-logic).
+
+### 2.1 The non-obvious consequence for privacy
+
+`PREFER_ON_DEVICE` is the mode every sample uses, and it silently sends the prompt to the cloud when Nano is missing.
+For a privacy tool that would be a leak.
+So raw text is only ever given to a model created with `InferenceMode.ONLY_ON_DEVICE`, which throws instead of falling back.
+As a second check, any on-device answer whose `inferenceSource` is not `ON_DEVICE` is discarded and the run is blocked.
+The cloud model is created with `InferenceMode.ONLY_IN_CLOUD` and only ever receives the redacted payload.
+The `PREFER_*` modes are not used anywhere in this app.
+
+### 2.2 An SDK behaviour that contradicts the docs, found by reading the source
+
+In the installed SDK (`firebase` 13.4.0, which bundles `@firebase/ai` 3.1.0), `getGenerativeModel` builds its on-device adapter through `chromeAdapterFactory`, which returns `undefined` when `window.LanguageModel` does not exist (`dist/esm/index.esm.js`, `function chromeAdapterFactory`).
+`callCloudOrDevice` then starts with `if (!chromeAdapter) { return { response: await inCloudCall(), inferenceSource: InferenceSource.IN_CLOUD } }`, before it looks at the mode.
+So in a browser without the Prompt API at all (Firefox, Safari, older Chrome, Chrome with the API off), a model created with `ONLY_ON_DEVICE` sends the prompt to the cloud instead of throwing.
+The docs say `ONLY_ON_DEVICE` should "throw an exception" when the on-device model is not available.
+The SDK's `InferenceSource` values are the strings `"on_device"` and `"in_cloud"`, so code must compare with the exported constant, not with the text `ON_DEVICE` printed in the docs.
+Consequences for this app:
+
+- `FirebaseOnDeviceModel` refuses to call `generateContent` unless `LanguageModel` exists on the global object and `LanguageModel.availability()` is not `unavailable`; this check runs before every call, not once.
+- A test runs the real SDK with no `LanguageModel` and a stubbed `fetch`, and shows the SDK would call the network in `ONLY_ON_DEVICE` mode, while our wrapper blocks the call and `fetch` is never reached.
+- The `inferenceSource` check stays as a second line, but it runs after the fact and is not relied on for the guarantee.
+
+## 3. Data flow and the trust boundary
+
+```
+ ON THIS DEVICE (trusted)                                   | CLOUD (untrusted)
+                                                            |
+ user text + task instruction                               |
+        |                                                   |
+        v                                                   |
+ [1] pattern detector (deterministic, no model)             |
+     emails, phones, card numbers (Luhn), IBAN (mod 97),    |
+     US SSN, IPv4                                           |
+        |                                                   |
+        v                                                   |
+ [2] on-device entity finder: Gemini Nano via Firebase      |
+     AI Logic, ONLY_ON_DEVICE, JSON schema output           |
+     names, street addresses, other identifiers             |
+     - unavailable / throws / bad JSON / wrong source       |
+       -> BLOCKED, nothing is sent                          |
+        |                                                   |
+        v                                                   |
+ [3] redactor: each value -> placeholder like [EMAIL_1];    |
+     the vault (placeholder -> value) never leaves memory   |
+        |                                                   |
+        v                                                   |
+ [4] route decision                                         |
+     device-only: Nano answers from the original text  -----|-- nothing crosses
+     cloud-redacted: continue                               |
+        |                                                   |
+        v                                                   |
+ [5] egress guard: re-scan the payload with [1] and check   |
+     every vault value is absent; any hit -> BLOCKED        |
+        |                                                   |
+        +---- exact payload string ------------------------>| [6] Gemini via Firebase AI Logic,
+                                                            |     ONLY_IN_CLOUD, App Check
+        +<--- answer with placeholders ---------------------|
+        v                                                   |
+ [7] restorer: placeholders -> original values              |
+        |                                                   |
+        v                                                   |
+ answer shown to the user                                   |
+```
+
+The vault, the original text and the restored answer exist only in page memory.
+Nothing is written to `localStorage`, `sessionStorage`, IndexedDB, cookies or logs.
+The app makes no analytics or third-party requests; fonts are bundled.
+The only network calls in live mode are the Firebase SDK's own calls (App Check and the AI Logic endpoint).
+
+## 4. The model interface
+
+All model access goes through one interface in `src/core/types.ts`:
+
+```ts
+interface ModelClient {
+  readonly location: 'device' | 'cloud';
+  readonly simulated: boolean;
+  readonly label: string;
+  status(): Promise<ModelStatus>;
+  prepare(onProgress?: (fraction: number) => void): Promise<void>;
+  generate(request: GenerateRequest): Promise<GenerateResult>;
+}
+```
+
+There are three implementations.
+
+- `FirebaseOnDeviceModel` (`src/models/firebase-on-device.ts`): Gemini Nano through Firebase AI Logic with `InferenceMode.ONLY_ON_DEVICE`; `status()` uses `LanguageModel.availability()` from the Prompt API; it reports `ranOn` from `response.inferenceSource`.
+- `FirebaseCloudModel` (`src/models/firebase-cloud.ts`): Gemini through Firebase AI Logic with `InferenceMode.ONLY_IN_CLOUD`, App Check initialised first, config read only from `src/firebase-config.ts`.
+- `FakeModel` (`src/core/fake-model.ts`): deterministic, no network, `simulated: true`, usable as device or cloud, with failure injection for tests.
+
+The UI shows the label "Simulated" on every result produced by a fake model, and a banner across the page in demo mode.
+Simulated output is never presented as model output.
+
+## 5. Routes
+
+- `device-only`: the whole task runs on Gemini Nano with the original text; nothing leaves the device.
+- `cloud-redacted`: detection on device, redacted payload to the cloud, restoration on device.
+
+The user picks one of three preferences: "Auto", "Keep on this device", "Use the cloud (redacted)".
+Auto picks `device-only` for light tasks (summarize) when Nano is ready and the input is under the on-device budget, and `cloud-redacted` for heavy tasks (rewrite, draft a reply, custom) or long input.
+The on-device budget is 12,000 characters, about a third of the documented 9216-token limit, leaving room for the instruction and the answer.
+
+## 6. Failure behaviour
+
+The rule is: if we cannot prove the payload is clean, nothing is sent.
+
+| Situation | Behaviour |
+|---|---|
+| Nano unavailable, not downloaded, or Chrome without the Prompt API | `cloud-redacted` is blocked; the user sees what the pattern detector found and is told names and addresses cannot be checked without Nano. |
+| On-device call throws | Blocked, with the reason. |
+| `LanguageModel` is missing from the page | The on-device model is reported unavailable and never called, because the SDK would send the prompt to the cloud (section 2.2). |
+| On-device answer is not valid JSON for the schema | Blocked. |
+| `inferenceSource` of an on-device call is not `ON_DEVICE` | Blocked, and the user is told the SDK reported a cloud run. |
+| Egress guard finds a detected value or a pattern hit in the payload | Blocked. |
+| Firebase config is still the placeholder | Live mode is off; the cloud model is not constructed; demo mode is offered. |
+| Cloud call fails (network, App Check, quota) | The error is shown without echoing the payload or any vault value. |
+| Cloud answer drops or mangles a placeholder | Restoration is tolerant of case and spacing; any placeholder left over is listed. |
+
+Errors shown to the user and thrown inside the app never contain raw input, vault values or the payload.
+
+## 7. What is and is not caught
+
+Caught by the deterministic patterns: email addresses, phone numbers in common North American and international formats, payment card numbers that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form with invalid ranges excluded, IPv4 addresses.
+Caught by Gemini Nano, best effort: personal names, street addresses, and other identifiers the model recognises.
+Not guaranteed: names and addresses the on-device model misses, identifiers in formats the patterns do not cover, personal data implied by context (for example "my neighbour, the only dentist in town"), and anything inside images or attachments, which are not accepted.
+The README and the app say this in plain words.
+
+## 8. Test plan
+
+- Unit tests for each pattern, including Luhn and mod-97 edge cases and near misses that must not match.
+- Redaction and restoration round trips, placeholder collisions with text that already contains `[EMAIL_1]`, repeated values sharing one placeholder, overlapping detections.
+- The privacy guarantee: a recording fake cloud model captures the exact `prompt` string it receives; for a corpus of synthetic inputs, no value found by either detector appears in it, including values inside a custom instruction.
+- Fail closed: with the on-device detector unavailable, throwing, returning invalid JSON, or reporting a cloud source, the recording cloud model is never called and the outcome is `blocked`.
+- The Firebase cloud implementation: `firebase/ai` is mocked and the test asserts the exact arguments passed to `getGenerativeModel` (mode `ONLY_IN_CLOUD`) and to `generateContent`.
+- The Firebase on-device implementation: the test asserts mode `ONLY_ON_DEVICE`, and that a response with `inferenceSource` `IN_CLOUD` is rejected.
+- No persistence and no logging: tests spy on `console` and storage during a full run.
+- Browser check: Playwright with the bundled Chromium runs the built app in demo mode and in live mode with the placeholder config, fails on any console error, and saves desktop and phone screenshots.
+- All personal data in tests and fixtures is synthetic: `example.com` addresses, `555-01xx` numbers, published test card numbers.
+
+## 9. Configuration
+
+`src/firebase-config.ts` is the single place for the Firebase web config and the reCAPTCHA Enterprise site key.
+It ships with placeholder values that the app detects.
+The debug App Check token is never stored in the repository; the app sets `self.FIREBASE_APPCHECK_DEBUG_TOKEN = true` only in a development build on `localhost`.
