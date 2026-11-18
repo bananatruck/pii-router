@@ -56,7 +56,8 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
     ok: boolean,
     note: string,
     start: number,
-    ranOn: TraceStep['ranOn'] = deviceSource,
+    // Deterministic steps always run on the device for real, even when the models are simulated.
+    ranOn: TraceStep['ranOn'] = 'device',
   ) {
     trace.steps.push({ id, ok, note, ms: Math.max(0, now() - start), ranOn });
   }
@@ -121,7 +122,7 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
   const detectorNote = detectorFailure
     ? 'Local detection could not be verified.'
     : `${deviceValues} ${deviceValues === 1 ? 'value' : 'values'} found on the device.`;
-  step('device-detector', detectorFailure === null, detectorNote, detectorStart);
+  step('device-detector', detectorFailure === null, detectorNote, detectorStart, deviceSource);
   trace.redactedText = redaction.redacted.text;
   step('redact', true, `${trace.findings.length} findings replaced.`, start);
   start = now();
@@ -132,17 +133,17 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
     start = now();
     try {
       if ((await deps.device.status()).state !== 'ready') {
-        step('device-answer', false, 'Local model unavailable.', start);
+        step('device-answer', false, 'Local model unavailable.', start, deviceSource);
         return blocked('device-answer-unavailable');
       }
       const result = await deps.device.generate({
         prompt: buildDeviceAnswerPrompt(input.task, input.text, segments.instruction),
       });
       if (!localResult(result)) {
-        step('device-answer', false, 'Unexpected inference source.', start);
+        step('device-answer', false, 'Unexpected inference source.', start, deviceSource);
         return blocked('device-answer-wrong-source');
       }
-      step('device-answer', true, 'Local answer completed.', start);
+      step('device-answer', true, 'Local answer completed.', start, deviceSource);
       return {
         kind: 'answered',
         route,
@@ -152,7 +153,7 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
         trace,
       };
     } catch {
-      step('device-answer', false, 'Local answer failed.', start);
+      step('device-answer', false, 'Local answer failed.', start, deviceSource);
       return blocked('device-answer-failed');
     }
   }

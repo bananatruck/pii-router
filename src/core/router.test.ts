@@ -123,3 +123,14 @@ it('builds fixed task prompts and includes instructions only for custom tasks', 
     expect(buildDeviceAnswerPrompt(task, 'Original', 'Custom').includes('Instruction:\nCustom')).toBe(task === 'custom');
   }
 });
+it('labels only model steps as simulated; deterministic steps run on the device for real', async () => {
+  const result = await runPipeline(
+    { text: 'Dana Whitfield at dana@example.com.', task: 'rewrite', preference: 'cloud' },
+    { device: new FakeModel({ location: 'device' }), cloud: new FakeModel({ location: 'cloud' }) },
+  );
+  const ranOn = Object.fromEntries(result.trace.steps.map(s => [s.id, s.ranOn]));
+  expect(ranOn).toEqual({
+    patterns: 'device', 'device-detector': 'simulated-device', redact: 'device', route: 'device',
+    'egress-guard': 'device', 'cloud-call': 'simulated-cloud', restore: 'device',
+  });
+});
