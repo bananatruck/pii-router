@@ -44,3 +44,15 @@ it('provides wrong-source behavior for cloud and records rejected calls', async 
   await expect(recorder.generate({ prompt: '' })).rejects.toThrow('Simulated model failure.');
   expect(recorder.requests).toHaveLength(1);
 });
+it('finds the given names used by the built-in sample texts', async () => {
+  const fake = new FakeModel({ location: 'device' });
+  const result = await fake.generate({ prompt: 'Text:\nDana Whitfield, Marcus Bell and Priya Natarajan wrote in.', responseSchema: ENTITY_SCHEMA });
+  expect(parseDetectorOutput(result.text)).toEqual({
+    ok: true,
+    entities: [
+      { text: 'Dana Whitfield', type: 'PERSON' },
+      { text: 'Marcus Bell', type: 'PERSON' },
+      { text: 'Priya Natarajan', type: 'PERSON' },
+    ],
+  });
+});

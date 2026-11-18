@@ -3,10 +3,10 @@ import type { GenerateRequest, GenerateResult, ModelClient, ModelLocation, Model
 export type FakeBehaviour = 'ok' | 'unavailable' | 'needs-download' | 'throws' | 'bad-json' | 'wrong-source';
 export const DEMO_GIVEN_NAMES = [
   'Alice', 'Adam', 'Amelia', 'Andrew', 'Anna', 'Benjamin', 'Brian', 'Charlotte',
-  'Chloe', 'Daniel', 'David', 'Edward', 'Elizabeth', 'Emily', 'Emma', 'Ethan',
+  'Chloe', 'Dana', 'Daniel', 'David', 'Edward', 'Elizabeth', 'Emily', 'Emma', 'Ethan',
   'Grace', 'Hannah', 'Henry', 'Isabella', 'Jack', 'James', 'Jane', 'Jessica',
   'John', 'Joseph', 'Julia', 'Liam', 'Lily', 'Lucas', 'Lucy', 'Mary', 'Matthew',
-  'Michael', 'Noah', 'Olivia', 'Oscar', 'Robert', 'Sarah', 'Sophia', 'Thomas', 'William',
+  'Marcus', 'Michael', 'Noah', 'Olivia', 'Oscar', 'Priya', 'Robert', 'Sarah', 'Sophia', 'Thomas', 'William',
 ];
 export class FakeModel implements ModelClient {
   readonly simulated = true;
