@@ -11,7 +11,10 @@ import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
 const PORT = 4173;
-const BASE = `http://localhost:${PORT}/`;
+// Set E2E_BASE_URL to check a deployed copy (for example the GitHub Pages site) instead of a local build.
+const REMOTE = process.env.E2E_BASE_URL;
+const BASE = REMOTE ?? `http://localhost:${PORT}/`;
+const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', new URL(BASE).hostname]);
 const SHOTS = new URL('../docs/screenshots/', import.meta.url);
 
 const SAMPLE_VALUES = ['Dana Whitfield', 'dana.whitfield@example.com', '(312) 555-0142', '4111 1111 1111 1111'];
@@ -58,7 +61,7 @@ async function checkViewport(browser, viewport) {
   page.on('pageerror', (err) => problems.push(`page error: ${err.message}`));
   page.on('request', (req) => {
     const host = new URL(req.url()).hostname;
-    if (host !== 'localhost' && host !== '127.0.0.1') problems.push(`third-party request: ${req.url()}`);
+    if (!ALLOWED_HOSTS.has(host)) problems.push(`third-party request: ${req.url()}`);
   });
 
   await page.goto(BASE);
@@ -84,14 +87,27 @@ async function checkViewport(browser, viewport) {
   await page.waitForTimeout(2500); // let the reveal animations finish before the screenshot
   const answer = await page.getByTestId('restored-answer').innerText();
   if (!answer.includes('Dana Whitfield')) fail(`${viewport.name}: restored answer lacks the restored name`);
-  await page.screenshot({ path: new URL(`${viewport.name}-cloud-run.png`, SHOTS).pathname, fullPage: true });
+  if (!REMOTE) await page.screenshot({ path: new URL(`${viewport.name}-cloud-run.png`, SHOTS).pathname, fullPage: true });
 
   // Light task: Auto keeps everything on the device.
   await page.getByLabel('Task').selectOption('summarize');
   await run(page);
   await page.getByTestId('cloud-device-only-panel').waitFor({ timeout: 15000 });
   await page.waitForTimeout(1500);
-  await page.screenshot({ path: new URL(`${viewport.name}-device-only.png`, SHOTS).pathname, fullPage: true });
+  if (!REMOTE) await page.screenshot({ path: new URL(`${viewport.name}-device-only.png`, SHOTS).pathname, fullPage: true });
+
+  // Fail closed: with Gemini Nano unavailable, a heavy task is blocked and nothing is sent.
+  await page.getByTestId('simulate-nano-unavailable').check();
+  await page.getByLabel('Task').selectOption('rewrite');
+  await run(page);
+  await page.getByTestId('outcome-blocked').waitFor({ timeout: 15000 });
+  if (!(await page.getByTestId('cloud-blocked-panel').innerText()).includes('Nothing was sent.')) {
+    fail(`${viewport.name}: blocked state does not say nothing was sent`);
+  }
+  if ((await page.getByTestId('outbound-payload').count()) !== 0) fail(`${viewport.name}: a payload is shown while blocked`);
+  if (!(await page.getByTestId('status-nano').innerText()).includes('unavailable')) fail(`${viewport.name}: Nano pill`);
+  if (!REMOTE) await page.screenshot({ path: new URL(`${viewport.name}-blocked.png`, SHOTS).pathname, fullPage: true });
+  await page.getByTestId('simulate-nano-unavailable').uncheck();
 
   // No horizontal page scroll at this width.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -104,9 +120,11 @@ async function checkViewport(browser, viewport) {
 
 async function main() {
   await mkdir(SHOTS, { recursive: true });
-  const server = spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort'], {
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
+  const server = REMOTE
+    ? null
+    : spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort'], {
+        stdio: ['ignore', 'ignore', 'inherit'],
+      });
   let exitCode = 0;
   const browser = await chromium.launch();
   try {
@@ -119,7 +137,7 @@ async function main() {
     exitCode = 1;
   } finally {
     await browser.close();
-    server.kill('SIGTERM');
+    server?.kill('SIGTERM');
   }
   process.exit(exitCode);
 }
