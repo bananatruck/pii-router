@@ -23,7 +23,12 @@ export function luhnValid(digits: string): boolean {
 
 export function ibanValid(iban: string): boolean {
   const compact = iban.replace(/\s/g, '').toUpperCase();
-  if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(compact) || IBAN_LENGTHS[compact.slice(0, 2)] !== compact.length) return false;
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(compact)) return false;
+  // Countries in the table must have their registered length; any other country code is accepted
+  // at the ISO 13616 bounds (15 to 34 characters) when the mod-97 check passes, so a missing table
+  // entry can never hide a valid IBAN (round-2 review, for example a Saudi IBAN).
+  const expected = IBAN_LENGTHS[compact.slice(0, 2)];
+  if (expected === undefined ? compact.length < 15 || compact.length > 34 : expected !== compact.length) return false;
   let remainder = 0;
   for (const char of compact.slice(4) + compact.slice(0, 4)) {
     for (const digit of /[A-Z]/.test(char) ? String(char.charCodeAt(0) - 55) : char) {

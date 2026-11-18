@@ -11,7 +11,9 @@ function vaultValueLeaks(payload: string, value: string): boolean {
 }
 
 export function checkEgress(payload: string, vault: Vault): { ok: true } | { ok: false; reason: string } {
-  const hit = detectPatterns(payload)[0] ?? detectPatterns(foldPayloadForScan(payload))[0];
+  // Only placeholders this run generated are exempt; a lookalike typed by the user is scanned.
+  const options = { allowedPlaceholders: new Set(vault.entries.keys()) };
+  const hit = detectPatterns(payload, options)[0] ?? detectPatterns(foldPayloadForScan(payload), options)[0];
   if (hit) return { ok: false, reason: `Remaining ${hit.type} pattern.` };
   for (const { type, value } of vault.entries.values()) {
     if (vaultValueLeaks(payload, value)) return { ok: false, reason: `Remaining ${type} value.` };

@@ -24,12 +24,29 @@ describe('patterns', () => {
     expect(hits).toEqual([{ type, value, start: 9, end: 9 + value.length }]);
   });
   it.each([
-    'year 2026', '$1234.56', '$2025550100', '€2025550100', '2026-11-17', '11/17/2026', 'v1.2.3', '1.2.3',
-    'ZIP 90210', '[EMAIL_1] [PHONE_12] [ EMAIL 1 ]', '4111 1111 1111 1112',
-    'GB82 WEST 1234 5698 7654 33', '000-05-1120', '666-05-1120', '900-05-1120',
-    '078-00-1120', '078-05-0000', '256.0.0.1', '1.2.3.4.5', 'hello@example',
-    '+1234567', '+1234567890123456', '123-456-7890',
+    'year 2026', '$1234.56', '2026-11-17', '11/17/2026', 'v1.2.3', '1.2.3',
+    'ZIP 90210', '256.0.0.1', '1.2.3.4.5', 'hello@example', '+1234567',
   ])('ignores %s', text => expect(detectPatterns(text)).toEqual([]));
+  // Values that fail a specific validator (Luhn, SSN ranges, mod-97, phone rules) are not given that
+  // type, but 9 or more digits are still masked by the generic ID run (round-2 review).
+  it.each([
+    '$2025550100', '€2025550100', '4111 1111 1111 1112', 'GB82 WEST 1234 5698 7654 33',
+    '000-05-1120', '666-05-1120', '900-05-1120', '078-00-1120', '078-05-0000',
+    '+1234567890123456', '123-456-7890',
+  ])('does not classify %s as a specific type but masks its digits as ID', text => {
+    const hits = detectPatterns(text);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every(h => h.type === 'ID')).toBe(true);
+  });
+  it('scans user-typed placeholder lookalikes unless this run generated them', () => {
+    expect(detectPatterns('[PHONE_2025550100]').map(h => h.type)).toEqual(['ID']);
+    expect(detectPatterns('[EMAIL_1] [PHONE_12] [ EMAIL 1 ]')).toEqual([]);
+    const allowed = new Set(['[PHONE_2025550100]']);
+    expect(detectPatterns('[PHONE_2025550100]', { allowedPlaceholders: allowed })).toEqual([]);
+  });
+  it('accepts a checksum-valid IBAN from a country missing from the length table', () => {
+    expect(detectPatterns('IBAN SA0380000000608010167519.').map(h => h.type)).toEqual(['IBAN']);
+  });
   it.each(['202-555-0100', '192.0.2.1'])('detects %s before a sentence-ending period', value => {
     expect(detectPatterns(`Contact ${value}.`)[0]?.value).toBe(value);
   });
