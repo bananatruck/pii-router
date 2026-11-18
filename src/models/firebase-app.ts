@@ -1,35 +1,17 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAI, GoogleAIBackend, type AI } from 'firebase/ai';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
-import {
-  firebaseConfig,
-  isFirebaseConfigured,
-  isRecaptchaConfigured,
-  recaptchaEnterpriseSiteKey,
-} from '../firebase-config';
+import { firebaseConfig, recaptchaEnterpriseSiteKey } from '../firebase-config';
+import { isLocalhostDev, liveConfigProblem } from './live-config';
 
 let cachedFirebase: { app: FirebaseApp; ai: AI } | null = null;
 let unavailableReason: string | null = null;
-
-function isLocalhostDev(): boolean {
-  if (!import.meta.env.DEV) {
-    return false;
-  }
-  const hostname = globalThis.location?.hostname;
-  return hostname === 'localhost' || hostname === '127.0.0.1';
-}
 
 /**
  * Returns the reason why Firebase AI Logic is unavailable, or null when ready.
  */
 export function firebaseUnavailableReason(): string | null {
-  if (!isFirebaseConfigured()) {
-    return 'Firebase is not configured yet (src/firebase-config.ts still contains placeholder values).';
-  }
-  if (!isLocalhostDev() && !isRecaptchaConfigured()) {
-    return 'App Check reCAPTCHA Enterprise site key is not configured for production (src/firebase-config.ts still contains the placeholder site key).';
-  }
-  return unavailableReason;
+  return liveConfigProblem() ?? unavailableReason;
 }
 
 /**
@@ -37,10 +19,7 @@ export function firebaseUnavailableReason(): string | null {
  * Returns null when Firebase or production App Check is not configured.
  */
 export function getFirebase(): { app: FirebaseApp; ai: AI } | null {
-  if (!isFirebaseConfigured()) {
-    return null;
-  }
-  if (!isLocalhostDev() && !isRecaptchaConfigured()) {
+  if (liveConfigProblem() !== null) {
     return null;
   }
   if (cachedFirebase) {

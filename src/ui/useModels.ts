@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FakeModel, type ModelClient, type ModelStatus } from '@/core';
-import { createLiveModels } from '@/models';
+import { liveConfigProblem } from '@/models/live-config';
 
 export type AppMode = 'live' | 'simulated';
 
@@ -8,6 +8,25 @@ export interface LiveModelSet {
   device: ModelClient;
   cloud: ModelClient | null;
   liveReason: string | null;
+}
+
+/** Stand-in for live models that cannot run; live mode is never selectable while liveReason is set. */
+function unavailableLiveSet(reason: string): LiveModelSet {
+  const fail = async (): Promise<never> => {
+    throw new Error(reason);
+  };
+  return {
+    device: {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano (not loaded)',
+      status: async () => ({ state: 'unavailable', reason }),
+      prepare: fail,
+      generate: fail,
+    },
+    cloud: null,
+    liveReason: reason,
+  };
 }
 
 export interface UseModelsOptions {
@@ -28,9 +47,19 @@ export interface UseModelsResult {
 }
 
 export function useModels(options?: UseModelsOptions): UseModelsResult {
+  const injected = options?.liveModels;
+  // Checked without the Firebase SDK. Only when live mode is possible is src/models (and the SDK)
+  // loaded, so the simulated demo never downloads or runs Firebase code.
+  const configProblem = useMemo(() => (injected ? null : liveConfigProblem()), [injected]);
+  const [loadedLive, setLoadedLive] = useState<LiveModelSet | null>(null);
+  const [userPickedMode, setUserPickedMode] = useState(false);
+
   const live = useMemo<LiveModelSet>(
-    () => options?.liveModels ?? createLiveModels(),
-    [options?.liveModels],
+    () =>
+      injected ??
+      loadedLive ??
+      unavailableLiveSet(configProblem ?? 'Loading Firebase AI Logic.'),
+    [injected, loadedLive, configProblem],
   );
 
   const [simulateNanoUnavailable, setSimulateNanoUnavailable] = useState(false);
@@ -48,6 +77,28 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   const [mode, setModeState] = useState<AppMode>(() =>
     live.liveReason === null ? 'live' : 'simulated',
   );
+
+  useEffect(() => {
+    if (injected || configProblem !== null) {
+      return;
+    }
+    let cancelled = false;
+    import('@/models')
+      .then(models => {
+        if (cancelled) return;
+        const set = models.createLiveModels();
+        setLoadedLive(set);
+        if (set.liveReason === null && !userPickedMode) setModeState('live');
+      })
+      .catch(() => {
+        if (!cancelled) setLoadedLive(unavailableLiveSet('Firebase AI Logic could not be loaded.'));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // userPickedMode is read once when the module arrives; it must not re-trigger the import.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injected, configProblem]);
 
   const activeMode: AppMode = live.liveReason !== null && mode === 'live' ? 'simulated' : mode;
   const device = activeMode === 'live' ? live.device : simulated.device;
@@ -79,6 +130,7 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
       if (next === 'live' && live.liveReason !== null) {
         return;
       }
+      setUserPickedMode(true);
       setModeState(next);
     },
     [live.liveReason],
