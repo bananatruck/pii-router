@@ -17,3 +17,9 @@ it('blocks a phone split across a newline in the folded scan', () => {
   expect(result.ok).toBe(false);
   if (!result.ok) expect(result.reason).toBe('Remaining PHONE pattern.');
 });
+
+it('does not block a clean payload because a value appears inside a generated placeholder (CodeRabbit)', () => {
+  const vault = { entries: new Map([['[PERSON_1]', { type: 'PERSON' as const, value: 'Son' }]]) };
+  expect(checkEgress('Write to [PERSON_1] today.', vault)).toEqual({ ok: true });
+  expect(checkEgress('Write to Son today.', vault).ok).toBe(false);
+});

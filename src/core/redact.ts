@@ -16,7 +16,8 @@ export const PLACEHOLDER_SOURCE = String.raw`\[\s*([A-Z]+)[ _-]+(\d+)(?:[ _-]+([
 const onlyPlaceholder = new RegExp(`^${PLACEHOLDER_SOURCE}$`, 'i');
 
 function canonical(type: PiiType, value: string): string {
-  if (type === 'EMAIL') return value.toLowerCase();
+  // Local parts are case-sensitive (RFC 5321), so only the domain is folded (CodeRabbit review).
+  if (type === 'EMAIL') return value.replace(/@[^@]*$/, domain => domain.toLowerCase());
   if (type === 'PHONE' || type === 'CARD' || type === 'SSN') return value.replace(/\D/g, '');
   if (type === 'IBAN') return value.replace(/\s/g, '');
   return value;

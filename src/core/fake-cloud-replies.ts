@@ -52,7 +52,7 @@ function rewrite(text: string): string {
   const body = capitalise(
     text
       .trim()
-      .replace(/^(?:hi|hello|hey|dear)\b[^,\n]*,\s*/i, '')
+      .replace(/^(?:hi|hello|hey|dear)\b[^,\n[]*,\s*/i, '') // never drop a placeholder in the greeting
       .replace(/\bI'd\b/g, 'I would')
       .replace(/\bThanks,/g, 'Thank you,'),
   );

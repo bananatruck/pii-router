@@ -88,3 +88,8 @@ it('does not end a sentence at a dot inside an email address or number', async (
   const summary = await cloud.generate({ prompt: buildCloudPrompt('summarize', 'Mail [EMAIL_1] at v2.5 today. Later.') });
   expect(summary.text).toBe('Summary: Mail [EMAIL_1] at v2.5 today.');
 });
+it('keeps a placeholder that sits inside the greeting of a simulated rewrite (CodeRabbit)', async () => {
+  const cloud = new FakeModel({ location: 'cloud' });
+  const result = await cloud.generate({ prompt: buildCloudPrompt('rewrite', 'Hi [EMAIL_1], please help.') });
+  expect(result.text).toContain('[EMAIL_1]');
+});

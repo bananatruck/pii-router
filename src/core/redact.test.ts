@@ -14,7 +14,7 @@ describe('redaction', () => {
     expect(restore(result.redacted.text + result.redacted.instruction, result.vault)).toEqual({ text: 'b@example.org calls 202-555-0100Send to a@example.com', unresolved: [] });
   });
   it('shares placeholders for equivalent values', () => {
-    const result = redact('alice@example.com ALICE@example.com 202-555-0100 (202) 555-0100 4111-1111-1111-1111 4111111111111111 078-05-1120 078 05 1120 GB82 WEST 1234 5698 7654 32 GB82WEST12345698765432');
+    const result = redact('alice@example.com alice@EXAMPLE.com 202-555-0100 (202) 555-0100 4111-1111-1111-1111 4111111111111111 078-05-1120 078 05 1120 GB82 WEST 1234 5698 7654 32 GB82WEST12345698765432');
     expect(result.vault.entries.size).toBe(5);
     expect(result.findings.map(f => f.placeholder)).toEqual(['[EMAIL_1]', '[EMAIL_1]', '[PHONE_1]', '[PHONE_1]', '[CARD_1]', '[CARD_1]', '[SSN_1]', '[SSN_1]', '[IBAN_1]', '[IBAN_1]']);
   });
@@ -95,5 +95,10 @@ describe('redaction', () => {
     expect(restore('No tokens', result.vault).unresolved).toEqual(['[EMAIL_1]', '[PHONE_1]']);
     const vault = { entries: new Map([['[OTHER_1]', { type: 'OTHER' as const, value: '[EMAIL_1]' }]]) };
     expect(restore('[OTHER_1]', vault).text).toBe('[EMAIL_1]');
+  });
+  it('keeps email addresses that differ only in local-part case apart (CodeRabbit)', () => {
+    const result = redact('Smith@example.com and smith@EXAMPLE.com');
+    expect(result.vault.entries.size).toBe(2);
+    expect(restore(result.redacted.text, result.vault).text).toBe('Smith@example.com and smith@EXAMPLE.com');
   });
 });
