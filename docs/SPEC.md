@@ -105,6 +105,15 @@ Consequences for this app:
 - A test runs the real SDK with no `LanguageModel` and a stubbed `fetch`, and shows the SDK would call the network in `ONLY_ON_DEVICE` mode, while our wrapper blocks the call and `fetch` is never reached.
 - The `inferenceSource` check stays as a second line, but it runs after the fact and is not relied on for the guarantee.
 
+Confirmed twice on 2026-11-18:
+
+- `src/models/sdk-fallback.test.ts` loads the browser build of `@firebase/ai` with no `LanguageModel` and a stubbed `fetch`: the SDK's `ONLY_ON_DEVICE` model calls `fetch` with the prompt in the body, and `FirebaseOnDeviceModel` never calls `fetch`.
+- `e2e/sdk-probe.mjs` repeats this in Playwright's Chromium 156 with `window.LanguageModel` removed and every Google host intercepted and aborted: the SDK tried to POST the prompt to `firebasevertexai.googleapis.com`; `FirebaseOnDeviceModel` threw `device-unavailable` and made no request.
+
+A related observation from the same Chromium on `localhost`: `LanguageModel` exists and reports `downloadable`.
+In that state our guard lets the call through, because the SDK's `ONLY_ON_DEVICE` path then waits for the on-device download and has a real on-device adapter; it does not go to the cloud.
+The router never asks the on-device model for anything unless its status is `ready`, so in practice the app blocks instead of waiting.
+
 ## 3. Data flow and the trust boundary
 
 ```
