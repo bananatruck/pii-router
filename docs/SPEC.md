@@ -204,8 +204,10 @@ The rule is: if we cannot prove the payload is clean, nothing is sent.
 | On-device call throws | Blocked, with the reason. |
 | `LanguageModel` is missing from the page | The on-device model is reported unavailable and never called, because the SDK would send the prompt to the cloud (section 2.2). |
 | On-device answer is not valid JSON for the schema | Blocked. |
-| `inferenceSource` of an on-device call is not `ON_DEVICE` | Blocked, and the user is told the SDK reported a cloud run. |
-| Egress guard finds a detected value or a pattern hit in the payload | Blocked. |
+| `inferenceSource` of an on-device call is not `ON_DEVICE` | Every route is blocked, including device-only, and the user is told the text may already have left the device. |
+| Egress guard finds a detected value or a pattern hit in the payload, or in a folded copy of it (digits joined across line breaks and separators) | Blocked. |
+| Input contains invisible or look-alike characters (zero-width, NBSP, fullwidth digits) | Text and instruction are normalized (NFKC, format characters removed) before any detection; the UI shows the normalized text. |
+| Run is clicked twice, or the mode is switched during a run | One run at a time; the mode switch is disabled while a run is in flight. |
 | Firebase config is still the placeholder | Live mode is off; the cloud model is not constructed; demo mode is offered. |
 | Cloud call fails (network, App Check, quota) | The error is shown without echoing the payload or any vault value. |
 | Cloud answer drops or mangles a placeholder | Restoration is tolerant of case and spacing; any placeholder left over is listed. |
@@ -214,12 +216,25 @@ Errors shown to the user and thrown inside the app never contain raw input, vaul
 
 ## 7. What is and is not caught
 
-Caught by the deterministic patterns: email addresses, phone numbers in common North American and international formats, payment card numbers that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form with invalid ranges excluded, IPv4 addresses.
+Caught by the deterministic patterns, after normalization: email addresses (including non-ASCII letters), phone numbers in common North American and international formats, payment card numbers with spaces, dashes or dots that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form with invalid ranges excluded, IPv4 addresses.
 Caught by Gemini Nano, best effort: personal names, street addresses, and other identifiers the model recognises.
-Not guaranteed: names and addresses the on-device model misses, identifiers in formats the patterns do not cover, personal data implied by context (for example "my neighbour, the only dentist in town"), and anything inside images or attachments, which are not accepted.
+Not guaranteed: names and addresses the on-device model misses (including when text in the input persuades it to report nothing; an empty answer cannot be told apart from a clean text), identifiers in formats the patterns do not cover, personal data implied by context (for example "my neighbour, the only dentist in town"), and anything inside images or attachments, which are not accepted.
 The README and the app say this in plain words.
 
-## 8. Test plan
+## 8. Adversarial review
+
+On 2026-11-18 Cursor (grok-4.7-high) reviewed the code read-only, trying to make a personal value reach the cloud, logs, storage or errors.
+Its findings and what was done:
+
+- Invisible and look-alike characters (zero-width spaces, NBSP, fullwidth digits, dotted card numbers, non-ASCII email letters) hid values from the patterns: fixed by normalizing input and widening the patterns, with a folded re-scan in the egress guard as a second line.
+- A model span that overlapped a pattern hit was dropped whole, so its other part was sent: fixed by redacting the uncovered remainder.
+- A race between the Prompt API check and model creation, plus model caching, could build a model with no on-device adapter: fixed by checking again with no `await` before creation and not caching; a detector call that reports a cloud run now stops every route.
+- A fast double click could start two runs, and the mode could change mid-run: fixed with a synchronous lock and a frozen mode switch.
+- A prompt injection that makes Gemini Nano report no entities cannot be detected; model-reported values are now matched case-insensitively and across whitespace, and section 7 states the limit.
+
+The review also checked, and found holding: placeholder injection, cloud error messages, storage, URLs, the clipboard (only on the user's Copy click), and that `ONLY_IN_CLOUD` is the only mode used for the cloud model.
+
+## 9. Test plan
 
 - Unit tests for each pattern, including Luhn and mod-97 edge cases and near misses that must not match.
 - Redaction and restoration round trips, placeholder collisions with text that already contains `[EMAIL_1]`, repeated values sharing one placeholder, overlapping detections.
@@ -231,7 +246,7 @@ The README and the app say this in plain words.
 - Browser check: Playwright with the bundled Chromium runs the built app in demo mode and in live mode with the placeholder config, fails on any console error, and saves desktop and phone screenshots.
 - All personal data in tests and fixtures is synthetic: `example.com` addresses, `555-01xx` numbers, published test card numbers.
 
-## 9. Configuration
+## 10. Configuration
 
 `src/firebase-config.ts` is the single place for the Firebase web config and the reCAPTCHA Enterprise site key.
 It ships with placeholder values that the app detects.
