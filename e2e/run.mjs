@@ -59,6 +59,10 @@ async function checkViewport(browser, viewport) {
     if (msg.type() === 'error' || msg.type() === 'warning') problems.push(`console ${msg.type()}: ${msg.text()}`);
   });
   page.on('pageerror', (err) => problems.push(`page error: ${err.message}`));
+  page.on('requestfailed', (req) => problems.push(`failed request: ${req.url()} (${req.failure()?.errorText ?? 'unknown'})`));
+  page.on('response', (res) => {
+    if (res.status() >= 400) problems.push(`HTTP ${res.status()}: ${res.url()}`);
+  });
   page.on('request', (req) => {
     const host = new URL(req.url()).hostname;
     if (!ALLOWED_HOSTS.has(host)) problems.push(`third-party request: ${req.url()}`);
