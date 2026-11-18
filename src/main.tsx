@@ -1,15 +1,18 @@
+import '@fontsource-variable/hanken-grotesk';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/600.css';
+import './index.css';
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-
-function Placeholder() {
-  return <p>PII Router is being built.</p>;
-}
+import { App } from './ui/App';
 
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <Placeholder />
+      <App />
     </StrictMode>,
   );
 }
