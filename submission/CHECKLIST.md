@@ -12,6 +12,7 @@ Each step names the rule that drives it, quoted from https://firebasehybridaihac
   Do not commit the debug token: "Entrants must not include production API keys, live Google Cloud project secrets ... within their repository".
 - [ ] **Record what the real run showed.** In `submission/DEVPOST.md`, replace each `[VERIFY AFTER REAL RUN]` marker with what you saw, or delete the sentence if it did not hold.
   Rule: "must function as depicted in the video and/or expressed in the text description".
+- [ ] **Confirm your voice.** In `submission/DEVPOST.md`, two first-person sentences are marked `[KESH TO CONFIRM]`; keep, reword or delete them, then remove the markers.
 - [ ] **Video (3 minutes or less).** Record with `submission/VIDEO_SCRIPT.md`, upload to YouTube as Public, add English captions, and paste the link in the form.
   Rule: "It should not be longer than 3 minutes", "uploaded to and made publicly visible on YouTube", "in English or include English subtitles", and it "should include footage that shows the Project functioning on the platform(s) for which it was built".
   Rule: the video must not contain "any third party advertising, slogan, logo, trademark"; record the app and Chrome only, with no other branded tabs or bookmarks visible.
@@ -27,7 +28,7 @@ Each step names the rule that drives it, quoted from https://firebasehybridaihac
   Check that GitHub shows "Apache-2.0 license" in the About sidebar.
 - [x] Hosted demo on GitHub Pages in the labelled simulated mode.
   Rule: "A hosted project is highly encouraged"; the project must be "available free of charge and without any restriction" to judges until judging ends; keep the site up until after Dec 16, 2026.
-- [x] No personal data in the repository: every name, email, phone, card, IBAN and SSN in the code and docs is synthetic (`example.com` addresses, `555-01xx` numbers, published test card and IBAN examples, the voided specimen SSN 078-05-1120).
+- [x] No personal data in the repository: every name, email, phone, card, IBAN and SSN in the code and docs is synthetic (`example.com`, `.org` and `.net` addresses, reserved or fictional phone numbers such as `555-01xx` and the UK drama range, RFC 5737 documentation IPs, published test card and IBAN examples, the voided specimen SSN 078-05-1120).
   Rule: entrants "must not include ... personally identifiable information (PII) within their repository, submission form, or testing instructions."
 - [x] Third-party code is listed with licenses in `THIRD_PARTY_NOTICES.md`.
   Rule: "Participants may use standard development tools, including frameworks, libraries, starter templates, and AI coding assistants, but must disclose any other pre-existing code or work incorporated into the Project."
@@ -36,7 +37,7 @@ Each step names the rule that drives it, quoted from https://firebasehybridaihac
 
 The rules list "AI coding assistants" as allowed standard tools.
 The honest description, already in `DEVPOST.md` and the README: this project was built overnight by AI coding agents directed by Kesh.
-Claude Code (Opus 5.5) led the work, designed it and integrated it; GPT 6.1 Sol through Codex wrote the redaction engine and its tests; Gemini 4 Argon through Antigravity made the mock-ups and wrote the Firebase integration layer and UI components; Cursor was used for an adversarial privacy review and small fixes.
+Claude Code (Opus 5.5) led the work, designed it and integrated it; GPT 6.1 Sol through Codex wrote the redaction engine and its tests; Gemini 4 Argon through Antigravity made the mock-ups and wrote the Firebase integration layer and the first version of the UI; Cursor (grok-4.7-high) ran an adversarial privacy review, and Cursor (composer-2.5) fixed most of its findings, split the UI into components and fixed some patterns.
 Keep that wording, or make it more specific, but do not make it vaguer.
 The rules also require that the submission is "the result of the Entrant's ideas and creativity"; the idea and the direction are yours, and the disclosure says plainly how the code was produced.
 

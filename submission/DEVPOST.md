@@ -35,7 +35,7 @@ firebase-ai-logic, gemini-nano, gemini, chrome-prompt-api, firebase-app-check, t
 
 ### Inspiration
 
-Every week I watch people paste customer emails, patient notes and HR cases into cloud chatbots, because the cloud model writes so much better than anything local.
+[KESH TO CONFIRM: this opening is drafted in your voice; keep it only if it is true for you.] Every week I watch people paste customer emails, patient notes and HR cases into cloud chatbots, because the cloud model writes so much better than anything local.
 Each paste hands a third party the names, emails, phone numbers and card numbers of people who never agreed to it.
 On-device models solve the privacy half but not the quality half: Gemini Nano is good at spotting a name, not at rewriting a long, careful reply.
 #BuildHybridAI asked for apps that use both, and I wanted the split between device and cloud to be decided by what the text contains, not only by whether a model happens to be available.
@@ -56,9 +56,9 @@ If the app cannot verify the text on the device, it sends nothing and tells you 
 
 The app is a Vite, React and TypeScript web app for desktop Chrome, using the Firebase JS SDK 13.4.0 (`firebase/ai`).
 All model access goes through one small interface with three implementations: Gemini Nano through Firebase AI Logic, Gemini in the cloud through Firebase AI Logic, and a deterministic fake used by the tests and by the labelled demo mode.
-Firebase AI Logic is imported and called at runtime in `src/models/firebase-on-device.ts` and `src/models/firebase-cloud.ts`, with App Check initialised first in `src/models/firebase-app.ts` (debug provider on localhost, reCAPTCHA Enterprise elsewhere).
+Firebase AI Logic is imported and called at runtime in `src/models/firebase-on-device.ts` and `src/models/firebase-cloud.ts`, with App Check initialised first in `src/models/firebase-app.ts` (the reCAPTCHA Enterprise provider, with the debug-token flag set first on localhost development builds so App Check uses a debug token there).
 The on-device detector uses structured output: the same JSON schema goes to `onDeviceParams.promptOptions.responseConstraint`, and anything that does not parse is rejected.
-Every response's `inferenceSource` is checked, and an on-device answer that reports a cloud source blocks the run.
+`response.inferenceSource` is checked on every on-device call, and a cloud source blocks the run.
 The privacy promise is enforced by tests rather than by trust: a recording cloud model captures the exact string it receives, and for 28 synthetic inputs across every task, no detected value appears in it.
 Further tests show that when Gemini Nano is unavailable, throws, returns malformed JSON or reports the wrong source, the cloud model is never called.
 Before publishing I had a second model attack the code: Cursor with grok-4.7-high, told to make a personal value reach the cloud, logs, storage or an error.
@@ -66,9 +66,9 @@ It found four real ways (invisible and look-alike characters, a model span lost 
 
 I built this overnight by directing AI coding agents, and I want to be plain about it.
 Claude Code (Opus 5.5) acted as tech lead: it read the rules and the Firebase and Chrome docs, wrote the specification, split the work and reviewed and integrated every change.
-GPT 6.1 Sol (through Codex) wrote the redaction engine and its tests, Gemini 4 Argon (through Antigravity) wrote the Firebase integration layer and the UI from a mock-up, and Cursor ran an adversarial privacy review and made small fixes.
+GPT 6.1 Sol (through Codex) wrote the redaction engine and its tests, Gemini 4 Argon (through Antigravity) wrote the Firebase integration layer and the first version of the UI from a mock-up, Cursor (grok-4.7-high) ran an adversarial privacy review, and Cursor (composer-2.5) fixed most of its findings, split the UI into components and fixed some patterns.
 The commit history says which agent wrote what.
-The idea, the product decisions and the review of the result are mine.
+[KESH TO CONFIRM] The idea, the product decisions and the review of the result are mine.
 
 ### Challenges I ran into
 
@@ -105,8 +105,8 @@ Reporting the `ONLY_ON_DEVICE` fallback to the Firebase team with the repro.
 Two Firebase AI Logic models, deliberately in non-default modes.
 Gemini Nano runs through `getGenerativeModel(ai, { mode: InferenceMode.ONLY_ON_DEVICE, onDeviceParams: { createOptions, promptOptions: { responseConstraint } } })` as a structured-output entity detector and, for light tasks, as the answerer; `initializeDeviceModel()` is called from the "Prepare Gemini Nano" button, as the docs require a user gesture.
 Gemini in the cloud runs through `getGenerativeModel(ai, { mode: InferenceMode.ONLY_IN_CLOUD })` (default model `gemini-3.5-flash-lite`) and only ever receives the redacted payload.
-`response.inferenceSource` is checked on every call.
-App Check is initialised before `getAI`, with the debug provider on localhost and reCAPTCHA Enterprise on hosted origins.
+`response.inferenceSource` is checked on every on-device call.
+App Check is initialised before `getAI` with the reCAPTCHA Enterprise provider; on localhost development builds the debug-token flag is set first, so a registered debug token is used.
 [VERIFY AFTER REAL RUN] In my real run in desktop Chrome, the detection step ran on Gemini Nano, the rewrite went to Gemini in the cloud, and the `generateContent` request in the Network tab contained only placeholders.
 
 ## Testing instructions for judges
@@ -126,7 +126,7 @@ Pre-existing code it includes: open source npm packages and four UI components c
 - Unit, privacy and UI tests: `pnpm test` passes, 285 tests in 12 files (run on 2026-11-18).
 - Lint, type-check and production build: `pnpm lint`, `pnpm typecheck`, `pnpm build` pass.
 - Browser: `pnpm e2e` drives the built app in Playwright's Chromium 156 at 1440 and 390 pixels wide in Simulated mode (cloud route, device-only route, and the blocked path) with no console errors and no third-party requests; screenshots are in `docs/screenshots/`.
-- The hosted demo: the same check was run against https://bananatruck.github.io/pii-router/ with `E2E_BASE_URL` and passed.
+- The hosted demo: the same check was run against https://bananatruck.github.io/pii-router/ with `E2E_BASE_URL` after each deploy and passed (observed in the build session; not recorded in the repository; rerun it with `E2E_BASE_URL=https://bananatruck.github.io/pii-router/ node e2e/run.mjs`).
 - SDK fallback: `pnpm e2e:sdk` reproduces it in Chromium 156.
 - Only tested against the fake or a mocked SDK: everything that needs a Firebase project or a downloaded Gemini Nano, that is the real on-device detection, the real cloud call, App Check, `initializeDeviceModel()`, and the real model's answers.
   The Firebase clients' calls are unit-tested with `firebase/ai` mocked, and written against the docs and the installed SDK types.

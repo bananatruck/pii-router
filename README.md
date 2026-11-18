@@ -119,7 +119,7 @@ pnpm e2e     # builds, serves and drives the app in the bundled Chromium, saves 
 ```
 
 The privacy tests (`src/core/privacy.test.ts`) run 28 synthetic inputs through every task and assert on the exact string the cloud model received.
-All personal data in this repository is synthetic: `example.com` addresses, numbers in the reserved `555-01xx` range, published test card and IBAN numbers, and the voided specimen SSN 078-05-1120.
+All personal data in this repository is synthetic: `example.com`, `.org` and `.net` addresses, reserved or fictional phone numbers (mostly the `555-01xx` range, plus the UK drama range 020 7946 0xxx), RFC 5737 documentation IP addresses, published test card and IBAN numbers, and the voided specimen SSN 078-05-1120.
 
 ## Project layout
 
@@ -137,7 +137,7 @@ submission/          setup guide, Devpost text, video script, checklist
 
 This project was built overnight by AI coding agents directed by Kesh.
 Claude Code (Opus 5.5) led: it read the rules and the Firebase and Chrome docs, wrote the specification, split the work, reviewed every change and integrated it.
-GPT 6.1 Sol (through Codex) wrote the redaction engine and its tests; Gemini 4 Argon (through Antigravity) made the mock-ups and wrote the Firebase integration layer and the UI; Cursor ran an adversarial privacy review and made small fixes.
+GPT 6.1 Sol (through Codex) wrote the redaction engine and its tests; Gemini 4 Argon (through Antigravity) made the mock-ups and wrote the Firebase integration layer and the first version of the UI; Cursor (grok-4.7-high) ran an adversarial privacy review, and Cursor (composer-2.5) fixed most of its findings, split the UI into components and fixed some patterns.
 The commit messages say which agent wrote what.
 Third-party code is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

@@ -10,7 +10,7 @@ Where it cites documentation, the cited page is the source of truth, read on 202
 
 ## 1. The hackathon, as read
 
-Source pages (read live on 2026-11-17; byte-identical in content to the saved copies under `~/overnight-2026-11-17/hackathons/raw/`):
+Source pages (read live on 2026-11-17; identical in content to copies saved locally during the build):
 `https://firebasehybridaihackathon.devpost.com/`, `/rules` and `/resources`.
 
 ### 1.1 What must be built
@@ -48,7 +48,7 @@ A project can win the Grand Prize and at most one "Best of" prize; we target Bes
 
 ### 1.4 How this design answers the criteria
 
-- Technological Implementation: both inference modes that matter are used on purpose (`ONLY_ON_DEVICE` for anything that sees raw text, `ONLY_IN_CLOUD` for redacted text), the SDK's `inferenceSource` is checked, and the privacy guarantee is enforced by tests on the exact outbound payload.
+- Technological Implementation: both inference modes that matter are used on purpose (`ONLY_ON_DEVICE` for anything that sees raw text, `ONLY_IN_CLOUD` for redacted text), the SDK's `inferenceSource` is checked on every on-device call, and the privacy guarantee is enforced by tests on the exact outbound payload.
 - Design: one screen shows, live, what stayed on the device and what crossed to the cloud, character for character.
 - Potential Impact: people paste customer emails, medical notes and HR text into cloud chatbots every day; this lets them use a strong cloud model without handing over the personal details.
 - Quality of the Idea: the documented hybrid pattern is "on-device when available, cloud otherwise"; here the split is decided by what the text contains, and the on-device model acts as the privacy gate for the cloud model.
@@ -110,7 +110,7 @@ Confirmed twice on 2026-11-18:
 - `src/models/sdk-fallback.test.ts` loads the browser build of `@firebase/ai` with no `LanguageModel` and a stubbed `fetch`: the SDK's `ONLY_ON_DEVICE` model calls `fetch` with the prompt in the body, and `FirebaseOnDeviceModel` never calls `fetch`.
 - `e2e/sdk-probe.mjs` repeats this in Playwright's Chromium 156 with `window.LanguageModel` removed and every Google host intercepted and aborted: the SDK tried to POST the prompt to `firebasevertexai.googleapis.com`; `FirebaseOnDeviceModel` threw `device-unavailable` and made no request.
 
-A related observation from the same Chromium on `localhost`: `LanguageModel` exists and reports `downloadable`.
+A related observation from the same Chromium on `localhost`, checked by hand during the build and not recorded by a script: `LanguageModel` exists and reports `downloadable`.
 In that state our guard lets the call through, because the SDK's `ONLY_ON_DEVICE` path then waits for the on-device download and has a real on-device adapter; it does not go to the cloud.
 The router never asks the on-device model for anything unless its status is `ready`, so in practice the app blocks instead of waiting.
 
@@ -241,10 +241,10 @@ The review also checked, and found holding: placeholder injection, cloud error m
 - The privacy guarantee: a recording fake cloud model captures the exact `prompt` string it receives; for a corpus of synthetic inputs, no value found by either detector appears in it, including values inside a custom instruction.
 - Fail closed: with the on-device detector unavailable, throwing, returning invalid JSON, or reporting a cloud source, the recording cloud model is never called and the outcome is `blocked`.
 - The Firebase cloud implementation: `firebase/ai` is mocked and the test asserts the exact arguments passed to `getGenerativeModel` (mode `ONLY_IN_CLOUD`) and to `generateContent`.
-- The Firebase on-device implementation: the test asserts mode `ONLY_ON_DEVICE`, and that a response with `inferenceSource` `IN_CLOUD` is rejected.
+- The Firebase on-device implementation: the test asserts mode `ONLY_ON_DEVICE`, maps `IN_CLOUD` to `ranOn: 'cloud'`, refuses when the Prompt API is missing or disappears during the availability check, and creates a fresh model per call; the router tests assert that a cloud source blocks the run.
 - No persistence and no logging: tests spy on `console` and storage during a full run.
-- Browser check: Playwright with the bundled Chromium runs the built app in demo mode and in live mode with the placeholder config, fails on any console error, and saves desktop and phone screenshots.
-- All personal data in tests and fixtures is synthetic: `example.com` addresses, `555-01xx` numbers, published test card numbers.
+- Browser check: Playwright with the bundled Chromium runs the built app in Simulated mode at 1440 and 390 pixels wide (cloud route, device-only route, blocked path), fails on any console error or warning or third-party request, and saves desktop and phone screenshots.
+- All personal data in tests and fixtures is synthetic: `example.com`, `.org` and `.net` addresses, reserved or fictional phone numbers (`555-01xx`, the UK drama range), RFC 5737 documentation IPs, published test card and IBAN numbers, and the voided specimen SSN 078-05-1120.
 
 ## 10. Configuration
 

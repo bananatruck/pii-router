@@ -32,6 +32,7 @@ Doc: https://firebase.google.com/docs/web/learn-more#config-object
 2. Copy the `firebaseConfig` values into `src/firebase-config.ts`, replacing every `PLACEHOLDER_...` value.
    The web config identifies the project and is not a secret, so it can be committed.
 3. Leave `recaptchaEnterpriseSiteKey` as the placeholder for local testing.
+   The App Check SDK still loads the reCAPTCHA Enterprise script with that placeholder key, even though the debug token is what authenticates on localhost; I could not run this, so watch the console in step 4 and note any reCAPTCHA errors.
 
 ## 4. App Check debug token for localhost
 
@@ -41,6 +42,7 @@ Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 4) 
 2. Run the app locally: `pnpm install` then `pnpm dev`, and open `http://localhost:5173`.
    In a development build on localhost the app sets `self.FIREBASE_APPCHECK_DEBUG_TOKEN = true` before `initializeAppCheck`, as the doc says.
 3. Open DevTools > Console and copy the line `Firebase App Check debug token: ...`.
+   The SDK prints it only when it creates a new token on the first load; if you miss it, clear the site data for localhost (DevTools > Application > Storage > Clear site data) and reload.
 4. In the console, go to Security > App Check > Apps, open the overflow menu on the web app, choose Manage debug tokens, and add the token.
 5. Never paste the token into a file in the repository, an issue or the Devpost form ("Don't commit your debug token to a public repository").
 
@@ -61,7 +63,7 @@ Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 1) 
 
 1. With `pnpm dev` running and the debug token registered, reload `http://localhost:5173`.
    The header pills should read "Gemini Nano: ready", "Firebase: connected", "Live".
-2. Click "Use sample" to load the synthetic support email, pick "Rewrite to sound professional", leave the route on "Auto", and click "Run".
+2. Click "Use sample" and choose "Support email" to load the synthetic support email, pick "Rewrite to sound professional", leave the route on "Auto", and click "Run".
 3. Check in the app: the step strip shows Patterns and Gemini Nano on the device side, the cloud step marked "cloud", and the payload panel contains placeholders such as `[PERSON_1]` and `[EMAIL_1]` and no amber values.
 4. Check independently: DevTools > Network, filter `firebasevertexai`, open the `generateContent` request, and read its payload.
    It must contain the placeholders and none of the sample's name, email, phone or card number.
