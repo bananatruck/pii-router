@@ -1,7 +1,7 @@
 /**
  * Library: Aceternity UI (TextGenerateEffect)
  * Original URL: https://ui.aceternity.com/registry/text-generate-effect.json
- * License: MIT
+ * License: Aceternity UI licence, https://ui.aceternity.com/licence (not MIT; see THIRD_PARTY_NOTICES.md)
  * Retrieval date: 2026-11-18
  * Modifications:
  * - Adapted for strict TypeScript, noUncheckedIndexedAccess, and verbatimModuleSyntax.
