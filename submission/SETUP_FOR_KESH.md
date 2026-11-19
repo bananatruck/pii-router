@@ -75,6 +75,7 @@ Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 1) 
 3. Hardware, from the Prompt API page: Windows 10 or 11, macOS 13+, or Linux; at least 22 GB free on the volume with your Chrome profile; a GPU with more than 4 GB of VRAM, or 16 GB of RAM and 4 CPU cores; an unmetered connection for the download.
 4. Download Gemini Nano (required on the fast path; otherwise the first real run waits for it): on `http://localhost:5173`, open DevTools > Console and run `await LanguageModel.availability();`.
    This calls Chrome's Prompt API directly, so it works before the Firebase config is pasted and whatever mode the app shows.
+   Chrome documents this download through [`LanguageModel.create()`](https://developer.chrome.com/docs/ai/prompt-api#use_the_prompt_api), without Firebase initialization.
    If it prints `downloadable`, run `await LanguageModel.create();` and wait.
    `chrome://on-device-internals` shows the model state.
 5. Once the config is pasted (steps 3 and 4) and the app shows "Live", the "Gemini Nano" pill should say "ready".
