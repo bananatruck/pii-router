@@ -10,7 +10,7 @@ export function CoverageNote() {
       <div>
         <h2 className="font-bold text-ink">What it can miss</h2>
         <p className="mt-1">
-          Not guaranteed: names and addresses the on-device model misses (including when text in the input talks it into reporting nothing), unseparated 7-digit local phone numbers such as 5550123, short identifiers under 9 digits that are not phone numbers (for example a 6-digit employee ID), numbers written in other digit systems (for example Arabic-Indic digits), personal data implied by context (for example &quot;my neighbour, the only dentist in town&quot;), and anything inside images or attachments, which are not accepted.
+          Not guaranteed: names and addresses the on-device model misses (including names or addresses split between the custom instruction and text, or when text in the input talks it into reporting nothing), unseparated 7-digit local phone numbers such as 5550123, short identifiers under 9 digits that are not phone numbers (for example a 6-digit employee ID), numbers written in other digit systems (for example Arabic-Indic digits), personal data implied by context (for example &quot;my neighbour, the only dentist in town&quot;), and anything inside images or attachments, which are not accepted.
         </p>
         <p className="mt-2">
           <a className="underline underline-offset-2" href="./LICENSE.txt">Licence (Apache-2.0)</a>
