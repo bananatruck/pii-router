@@ -11,7 +11,7 @@
 // Output goes to submission/video/ (gitignored): demo-<mode>-take.{srt,mp4}.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -243,8 +243,13 @@ async function main() {
   if (args.mode === 'simulated' && !(await page.getByTestId('simulated-banner').isVisible())) {
     throw new Error('simulated mode requested but the page shows no simulated banner');
   }
-  if (args.mode === 'live' && (await page.getByTestId('simulated-banner').count()) > 0) {
-    throw new Error('live mode requested but the page is in simulated mode; finish submission/SETUP_FOR_KESH.md first');
+  if (args.mode === 'live') {
+    // A configured app starts in Simulated while Firebase AI Logic loads, then switches to Live.
+    const left = await page
+      .getByTestId('simulated-banner')
+      .waitFor({ state: 'detached', timeout: 30000 })
+      .then(() => true, () => false);
+    if (!left) throw new Error('live mode requested but the page is in simulated mode; finish submission/SETUP_FOR_KESH.md first');
   }
 
   for (const scene of scenes(args.mode)) {
@@ -265,15 +270,17 @@ async function main() {
   }
   await page.waitForTimeout(800);
   const duration = since();
+  // The demo page's own video: with --profile, Chromium also records its initial blank page.
+  const video = page.video();
   await context.close();
   await browser?.close();
+  if (!video) throw new Error('no video was recorded');
+  const recorded = await video.path();
 
   const base = path.join(outDir, `demo-${args.mode}-take`);
   const srt = cues.map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join('\n');
   writeFileSync(`${base}.srt`, srt);
-  const webm = readdirSync(rawDir).find((f) => f.endsWith('.webm'));
-  if (!webm) throw new Error('no video was recorded');
-  renameSync(path.join(rawDir, webm), `${base}.webm`);
+  renameSync(recorded, `${base}.webm`);
   rmSync(rawDir, { recursive: true, force: true });
 
   // Captions sit in the band below the page: white Liberation Sans on the app's ink colour.

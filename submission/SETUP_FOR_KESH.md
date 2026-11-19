@@ -8,7 +8,7 @@ Work in `~/Documents/Projects/hackathons/pii-router` (Node 22.18 or later (or No
 ## Fast path
 
 1. Run `pnpm verify:setup`. On 2026-11-18 it reported two blockers: the placeholder config, and 6.4 GB free on the volume with your Chrome profile (Flatpak Chrome, `~/.var/app/com.google.Chrome`), where Chrome needs at least 22 GB free before it downloads Gemini Nano. Free about 16 GB first.
-2. Start the Gemini Nano download early, because it is the long wait: run `pnpm dev` (it serves `http://localhost:5173`, which step 5 needs), then do step 5.
+2. Start the Gemini Nano download early, because it is the long wait: run `pnpm dev` (it serves `http://localhost:5173`), then do step 5 including its console download (step 5.4), which is required on this fast path. The console download talks to Chrome's Prompt API directly, so it works before the Firebase config is pasted; the in-app "Prepare Gemini Nano" button appears only once the app is in Live mode.
 3. Do steps 1 to 4 while it downloads.
 4. Run `pnpm verify:setup` again until it says "ready for the real run". It checks the pasted config offline (it never prints the API key and makes no network request), checks that no App Check debug token was committed, re-checks the disk, and lists the `[VERIFY AFTER REAL RUN]` markers in `submission/DEVPOST.md` with the step that settles each.
 5. Do step 6 and update those markers with what you saw.
