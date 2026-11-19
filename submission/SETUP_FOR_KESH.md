@@ -13,6 +13,17 @@ Work in `~/Documents/Projects/hackathons/pii-router` (Node 22.18 or later (or No
 4. Run `pnpm verify:setup` again until it says "ready for the real run". It checks the pasted config offline (it never prints the API key and makes no network request), checks that no App Check debug token was committed, re-checks the disk, and lists the `[VERIFY AFTER REAL RUN]` markers in `submission/DEVPOST.md` with the step that settles each.
 5. Do step 6 and update those markers with what you saw.
 
+### What works before the Firebase config is pasted
+
+| Works without a Firebase config | Needs the config (and Live mode) |
+|---|---|
+| `pnpm dev`, the whole app in Simulated mode | Live mode and the "Firebase: connected" pill |
+| Enabling the Chrome flag (step 5.2) | The in-app "Gemini Nano" pill showing Chrome's real model |
+| Downloading Gemini Nano from the console (step 5.4) | The "Prepare Gemini Nano" button |
+| `pnpm verify:setup` (it reports the config as missing) | Any real model call, and the App Check debug token (step 4) |
+
+The app decides this in `src/models/live-config.ts`: without a config it never loads Firebase and stays in Simulated mode.
+
 You need: a Google account, desktop Chrome 139 or later, and a machine that meets the Prompt API hardware requirements (step 5).
 This laptop (G14, 16 GB RAM) meets the RAM rule; free disk is the problem.
 
@@ -62,11 +73,14 @@ Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 1) 
 1. Check `chrome://settings/help` shows version 139 or later.
 2. Open `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input`, set it to Enabled, and restart Chrome (on this laptop Chrome is the Flatpak `com.google.Chrome`; the flag page is the same).
 3. Hardware, from the Prompt API page: Windows 10 or 11, macOS 13+, or Linux; at least 22 GB free on the volume with your Chrome profile; a GPU with more than 4 GB of VRAM, or 16 GB of RAM and 4 CPU cores; an unmetered connection for the download.
-4. Optional, to download ahead of time: on `http://localhost:5173`, open DevTools > Console and run `await LanguageModel.availability();`.
+4. Download Gemini Nano (required on the fast path; otherwise the first real run waits for it): on `http://localhost:5173`, open DevTools > Console and run `await LanguageModel.availability();`.
+   This calls Chrome's Prompt API directly, so it works before the Firebase config is pasted and whatever mode the app shows.
+   Chrome documents this download through [`LanguageModel.create()`](https://developer.chrome.com/docs/ai/prompt-api#use_the_prompt_api), without Firebase initialization.
    If it prints `downloadable`, run `await LanguageModel.create();` and wait.
    `chrome://on-device-internals` shows the model state.
-5. In the app, the "Gemini Nano" pill should say "ready".
+5. Once the config is pasted (steps 3 and 4) and the app shows "Live", the "Gemini Nano" pill should say "ready".
    If it says "needs download", click "Prepare Gemini Nano" (the SDK requires a click before `initializeDeviceModel()`).
+   In Simulated mode the pill reports the stand-in ("ready (simulated)"), not Chrome's model, and the button does not appear.
 
 ## 6. Run the real end-to-end check
 

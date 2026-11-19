@@ -72,7 +72,7 @@ export const firebaseConfig = {
   });
 
   it('the repository passes its own debug-token check (CodeRabbit review)', () => {
-    const files = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
+    const files = execFileSync('git', ['ls-files'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] })
       .split('\n')
       .filter(p => /\.(ts|tsx|js|mjs|json|md)$/.test(p))
       .map(p => ({ path: p, text: readFileSync(p, 'utf8') }));

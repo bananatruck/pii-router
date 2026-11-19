@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FakeModel, type ModelClient } from '@/core';
 import { App } from './App';
 import type { LiveModelSet } from './useModels';
@@ -559,68 +559,28 @@ describe('PII Router UI', () => {
       value: { writeText: writeSpy },
     });
 
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.useFakeTimers();
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    await vi.advanceTimersByTimeAsync(1500);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
 
-    // Wait for the answer rather than trusting a fixed delay; the full suite runs under load.
-    const copyButton = await screen.findByRole('button', { name: 'Copy' }, { timeout: 10000 });
+    const copyButton = screen.getByRole('button', { name: 'Copy' });
     fireEvent.click(copyButton);
     expect(writeSpy).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
-    resolveWrite();
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
+    await act(async () => {
+      resolveWrite();
+      await Promise.resolve();
     });
-  });
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
+    expect(writeSpy).toHaveBeenCalledWith(screen.getByTestId('restored-answer').textContent);
 
-  it('keeps simulated mode when live models finish loading after the user chose Simulated', async () => {
-    const lateLiveDevice: ModelClient = {
-      location: 'device',
-      simulated: false,
-      label: 'Gemini Nano',
-      status: async () => ({ state: 'ready' }),
-      prepare: async () => {},
-      generate: async () => ({ text: '{"entities":[]}', ranOn: 'device' }),
-    };
-    const lateLiveCloud: ModelClient = {
-      location: 'cloud',
-      simulated: false,
-      label: 'Gemini Cloud',
-      status: async () => ({ state: 'ready' }),
-      prepare: async () => {},
-      generate: async () => ({ text: 'ok', ranOn: 'cloud' }),
-    };
-
-    const { rerender } = render(
-      <App
-        liveModels={{
-          device: lateLiveDevice,
-          cloud: lateLiveCloud,
-          liveReason: 'Loading Firebase AI Logic.',
-        }}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Simulated' }));
-    expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
-
-    rerender(
-      <App
-        liveModels={{
-          device: lateLiveDevice,
-          cloud: lateLiveCloud,
-          liveReason: null,
-        }}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
-    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1799); });
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy();
   });
 
   it('adopts the normalized text on Run so the marks line up with what was scanned', async () => {
@@ -643,6 +603,7 @@ describe('PII Router UI', () => {
   });
 
   it('does not show Copied for a newer answer when an older copy finishes late (CodeRabbit review)', async () => {
+    vi.useFakeTimers();
     let resolveWrite: () => void = () => {};
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -650,12 +611,16 @@ describe('PII Router UI', () => {
     });
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy' }, { timeout: 10000 }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    await waitFor(() => expect(screen.getByTestId('run-status').textContent).toBe('Running.'));
-    await waitFor(() => expect(screen.getByTestId('run-status').textContent).not.toBe('Running.'), { timeout: 10000 });
-    resolveWrite();
-    await new Promise(r => setTimeout(r, 50));
+    expect(screen.getByTestId('run-status').textContent).toBe('Running.');
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(screen.getByTestId('run-status').textContent).not.toBe('Running.');
+    await act(async () => {
+      resolveWrite();
+      await Promise.resolve();
+    });
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
   });
 });

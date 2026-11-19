@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { checkEgress } from './egress-guard';
+import { checkEgress, checkSplitAcrossSegments } from './egress-guard';
 import type { Vault } from './redact';
 const vault: Vault = { entries: new Map([
   ['[PERSON_1]', { type: 'PERSON', value: 'Alice Example' }],
@@ -22,4 +22,28 @@ it('does not block a clean payload because a value appears inside a generated pl
   const vault = { entries: new Map([['[PERSON_1]', { type: 'PERSON' as const, value: 'Son' }]]) };
   expect(checkEgress('Write to [PERSON_1] today.', vault)).toEqual({ ok: true });
   expect(checkEgress('Write to Son today.', vault).ok).toBe(false);
+});
+
+it.each([
+  ['Contact alice@', 'example.com', 'EMAIL'],
+  ['Contact al', 'ice@example.com', 'EMAIL'],
+  ['Call 202-        ', '5550100 about the refund.', 'PHONE'],
+  ['Call 202-55', '5-0100 about the refund.', 'PHONE'],
+  ['Call ２０２-        ', '５５５０１００ about the refund.', 'PHONE'],
+  ['Call 202-', '        5550100 about the refund.', 'PHONE'],
+  ['Call 202-  55', '5-0100 about the refund.', 'PHONE'],
+])('blocks a %s / %s split at the segment boundary', (instruction, text, type) => {
+  const result = checkSplitAcrossSegments(instruction, text, { entries: new Map() });
+  expect(result.ok).toBe(false);
+  if (!result.ok) expect(result.reason).toMatch(type === 'EMAIL' ? /EMAIL/ : /PHONE|ID/);
+});
+
+it.each([
+  ['', 'alice@example.com'],
+  ['Contact alice@example.com;', 'today'],
+  ['Contact: ', 'alice@example.com'],
+  ['List the top 3', '12 items'],
+  ['Call 202-555-0100        ', 'about the refund.'],
+])('does not count a value wholly within one segment as split: %s / %s', (instruction, text) => {
+  expect(checkSplitAcrossSegments(instruction, text, { entries: new Map() })).toEqual({ ok: true });
 });

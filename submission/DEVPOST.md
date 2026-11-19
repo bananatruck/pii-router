@@ -123,11 +123,11 @@ The simulated demo needs no account, payment or personal data, and the app inclu
 ## Existing project?
 
 No. This is a new project, created on November 17 and 18, 2026, inside the submission period.
-Pre-existing code it includes: open source npm packages and three UI components copied from Magic UI and React Bits, all listed with their licences in `THIRD_PARTY_NOTICES.md`.
+Pre-existing code it includes: open source npm packages and two MIT UI components copied from Magic UI, all listed with their licences in `THIRD_PARTY_NOTICES.md`.
 
 ## What was verified overnight, and how
 
-- Unit, privacy and UI tests: `pnpm test` passes, 335 tests in 14 files (run on 2026-11-18 at 23:04 PST).
+- Unit, privacy and UI tests: `pnpm test` passes, 369 tests in 17 files plus one skipped measurement (run on 2026-11-19 at 00:29 PST).
 - Lint, type-check and production build: `pnpm lint`, `pnpm typecheck`, `pnpm build` pass.
 - Browser: `pnpm e2e` drives the built app in Playwright's Chromium 156 at 1440 and 390 pixels wide in Simulated mode (cloud route, device-only route, and the blocked path) with no console errors and no third-party requests; screenshots are in `docs/screenshots/`.
 - The hosted demo: the same check was run against https://bananatruck.github.io/pii-router/ with `E2E_BASE_URL` after each deploy and passed (observed in the build session; not recorded in the repository; rerun it with `E2E_BASE_URL=https://bananatruck.github.io/pii-router/ node e2e/run.mjs`).
