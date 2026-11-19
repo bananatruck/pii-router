@@ -71,6 +71,9 @@ describe('round-2 review: values the patterns claim to catch, in hostile surroun
     ['phone with slashes', 'Call 202/555/0100.', ['202/555/0100']],
     ['card with doubled separators', 'Card 4111--1111--1111--1111.', ['4111--1111--1111--1111']],
     ['international phone with spaced parentheses (CodeRabbit)', 'Call +49 (30) 12345678 today.', ['12345678']],
+    ['7-digit local phone with a dash', 'Call me on 555-0142 tonight.', ['555-0142']],
+    ['7-digit local phone with dots', 'Office: 555.0177.', ['555.0177']],
+    ['7-digit local phone with a space', 'Ring 555 0163 after six.', ['555 0163']],
   ])('%s', async (_name, text, values) => {
     expectAbsent(await sentToCloud({ text }), values);
   });
@@ -106,5 +109,20 @@ describe('round-2 review: what Gemini Nano reported must be applied everywhere',
     expect(payload).toContain('#A-20931');
     expect(payload).toContain('2026-11-18');
     expect(payload).toContain('$1,250.00');
+  });
+});
+
+describe('round-4: a value split between the custom instruction and the text', () => {
+  it('never sends a phone number whose halves sit in the instruction and the text', async () => {
+    const payload = await sentToCloud({ task: 'custom', customInstruction: 'Call 202-', text: '555-0100 about the refund.' });
+    expectAbsent(payload, ['202-555-0100']);
+    const digits = payload.replace(/\D/g, '');
+    expect(digits).not.toContain('2025550100');
+    expect(payload).not.toMatch(/202-[\s\S]*555-0100/);
+  });
+
+  it('still answers when the instruction ends and the text starts with unrelated short numbers', async () => {
+    const payload = await sentToCloud({ task: 'custom', customInstruction: 'List the top 3', text: '12 items shipped on 2026-11-18.' });
+    expect(payload).toContain('2026-11-18');
   });
 });
