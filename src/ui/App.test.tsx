@@ -570,7 +570,10 @@ describe('PII Router UI', () => {
     fireEvent.click(copyButton);
     expect(writeSpy).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
-    await act(async () => { resolveWrite(); });
+    await act(async () => {
+      resolveWrite();
+      await Promise.resolve();
+    });
     expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
     expect(writeSpy).toHaveBeenCalledWith(screen.getByTestId('restored-answer').textContent);
 
@@ -614,7 +617,10 @@ describe('PII Router UI', () => {
     expect(screen.getByTestId('run-status').textContent).toBe('Running.');
     await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
     expect(screen.getByTestId('run-status').textContent).not.toBe('Running.');
-    await act(async () => { resolveWrite(); });
+    await act(async () => {
+      resolveWrite();
+      await Promise.resolve();
+    });
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
   });
 });
