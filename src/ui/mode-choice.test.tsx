@@ -5,21 +5,18 @@
 // after the click (CodeRabbit review: the old test injected models and never reached that path).
 // Modules are reset per test, so the gate never leaks into other test files.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 let releaseImport: () => void = () => {};
-let imported = false;
 
 beforeEach(() => {
   vi.resetModules();
-  imported = false;
   const gate = new Promise<void>(resolve => {
     releaseImport = resolve;
   });
   vi.doMock('@/models/live-config', () => ({ liveConfigProblem: () => null, isLocalhostDev: () => true }));
   vi.doMock('@/models', async () => {
     await gate;
-    imported = true;
     return {
       createLiveModels: () => ({
         device: {
@@ -48,9 +45,10 @@ it('stays in Simulated when the user picks it while the live models are still lo
   render(<App />);
   expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
   fireEvent.click(screen.getByRole('button', { name: 'Simulated' }));
-  releaseImport();
-  await waitFor(() => expect(imported).toBe(true));
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await act(async () => {
+    releaseImport();
+    await import('@/models');
+  });
   expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
 });
 
