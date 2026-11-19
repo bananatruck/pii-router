@@ -4,13 +4,13 @@ export function CoverageNote() {
       <div>
         <h2 className="font-bold text-ink">What it catches</h2>
         <p className="mt-1">
-          Caught by the deterministic patterns, after invisible characters are removed and look-alikes folded: email addresses, phone numbers in common North American and international formats, payment card numbers that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in AAA-GG-SSSS form with invalid ranges excluded, IPv4 addresses, 7-digit local phone numbers, and any other run of 9 or more digits 0 to 9 (after look-alike digits such as fullwidth ones are folded). Caught by Gemini Nano, best effort: personal names, street addresses, and other identifiers the model recognises.
+          Caught by the deterministic patterns, after invisible characters are removed and look-alikes folded: email addresses, phone numbers in common North American and international formats, payment card numbers that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in AAA-GG-SSSS form with invalid ranges excluded, IPv4 addresses, 7-digit local phone numbers separated by a dash, dot, or space, and any other run of 9 or more digits 0 to 9 (after look-alike digits such as fullwidth ones are folded). Caught by Gemini Nano, best effort: personal names, street addresses, and other identifiers the model recognises.
         </p>
       </div>
       <div>
         <h2 className="font-bold text-ink">What it can miss</h2>
         <p className="mt-1">
-          Not guaranteed: names and addresses the on-device model misses (including when text in the input talks it into reporting nothing), short identifiers under 9 digits that are not phone numbers (for example a 6-digit employee ID), numbers written in other digit systems (for example Arabic-Indic digits), personal data implied by context (for example &quot;my neighbour, the only dentist in town&quot;), and anything inside images or attachments, which are not accepted.
+          Not guaranteed: names and addresses the on-device model misses (including when text in the input talks it into reporting nothing), unseparated 7-digit local phone numbers such as 5550123, short identifiers under 9 digits that are not phone numbers (for example a 6-digit employee ID), numbers written in other digit systems (for example Arabic-Indic digits), personal data implied by context (for example &quot;my neighbour, the only dentist in town&quot;), and anything inside images or attachments, which are not accepted.
         </p>
         <p className="mt-2">
           <a className="underline underline-offset-2" href="./LICENSE.txt">Licence (Apache-2.0)</a>
