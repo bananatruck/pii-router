@@ -117,9 +117,11 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   const cloud = activeMode === 'live' ? live.cloud : simulated.cloud;
 
   const activeDeviceRef = useRef(device);
+  const statusGenerationRef = useRef(0);
 
   useEffect(() => {
     activeDeviceRef.current = device;
+    statusGenerationRef.current += 1;
   }, [device]);
 
   const [deviceStatus, setDeviceStatus] = useState<ModelStatus>(() =>
@@ -128,24 +130,25 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
       : { state: 'unavailable', reason: live.liveReason ?? 'Checking model status.' },
   );
 
-  const writeStatusIfCurrent = useCallback((client: ModelClient, next: ModelStatus) => {
-    if (client === activeDeviceRef.current) {
+  const writeStatusIfCurrent = useCallback((client: ModelClient, generation: number, next: ModelStatus) => {
+    if (client === activeDeviceRef.current && generation === statusGenerationRef.current) {
       setDeviceStatus(next);
     }
   }, []);
 
   const refreshStatus = useCallback(async (): Promise<ModelStatus> => {
     const client = activeDeviceRef.current;
+    const generation = ++statusGenerationRef.current;
     try {
       const next = await client.status();
-      writeStatusIfCurrent(client, next);
+      writeStatusIfCurrent(client, generation, next);
       return next;
     } catch {
       const fallback: ModelStatus = {
         state: 'unavailable',
         reason: 'Could not read on-device model status.',
       };
-      writeStatusIfCurrent(client, fallback);
+      writeStatusIfCurrent(client, generation, fallback);
       return fallback;
     }
   }, [writeStatusIfCurrent]);
@@ -168,16 +171,17 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   useEffect(() => {
     let cancelled = false;
     const client = device;
+    const generation = ++statusGenerationRef.current;
     void client
       .status()
       .then(status => {
         if (!cancelled) {
-          writeStatusIfCurrent(client, status);
+          writeStatusIfCurrent(client, generation, status);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          writeStatusIfCurrent(client, {
+          writeStatusIfCurrent(client, generation, {
             state: 'unavailable',
             reason: 'Could not read on-device model status.',
           });
@@ -204,15 +208,16 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   // Call device.prepare(onProgress) directly in the click handler to preserve the user gesture.
   const prepareDevice = useCallback(() => {
     const client = activeDeviceRef.current;
+    const generation = ++statusGenerationRef.current;
     const promise = client.prepare((fraction: number) => {
-      writeStatusIfCurrent(client, { state: 'downloading', fraction });
+      writeStatusIfCurrent(client, generation, { state: 'downloading', fraction });
     });
     void promise
       .then(() => {
-        if (client === activeDeviceRef.current) void refreshStatus();
+        if (client === activeDeviceRef.current && generation === statusGenerationRef.current) void refreshStatus();
       })
       .catch(() => {
-        if (client === activeDeviceRef.current) void refreshStatus();
+        if (client === activeDeviceRef.current && generation === statusGenerationRef.current) void refreshStatus();
       });
   }, [refreshStatus, writeStatusIfCurrent]);
 
