@@ -45,4 +45,5 @@ The rules also require that the submission is "the result of the Entrant's ideas
 
 - Web app rather than Chrome extension: reasons in `docs/SPEC.md` section 1.5.
 - Aceternity UI: its component was removed on 2026-11-18 because the licence forbids re-distributing source files in a public repository; nothing from Aceternity remains.
-- React Bits is "MIT + Commons Clause", which allows use "as part of an application, website, or product" but not selling the component itself; the notice is included.
+- React Bits: its component was removed on 2026-11-19 because its licence restricts source redistribution.
+  The restored-value reveal is written for this project under Apache-2.0.

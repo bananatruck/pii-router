@@ -1,7 +1,7 @@
 /**
  * Library: Magic UI (BorderBeam)
  * Original URL: https://magicui.design/r/border-beam.json
- * License: MIT
+ * License: MIT. Full notice: THIRD_PARTY_NOTICES.md at the repository and built-site root.
  * Retrieval date: 2026-11-18
  * Modifications:
  * - Adapted imports for verbatimModuleSyntax and strict TypeScript.

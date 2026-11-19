@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { PLACEHOLDER_SOURCE, type Finding, type RunOutcome } from '@/core';
-import DecryptedText from '@/components/vendor/decrypted-text';
+import { RestoredValue } from './RestoredValue';
 import { cn } from '@/lib/utils';
 import { normalizePlaceholderKey } from '../ui-format';
 
@@ -96,14 +96,7 @@ export function renderRestoredAnswer(
             key={`ans-restored-${idx}`}
             className="inline rounded-none bg-marker-amber px-1 py-0.5 font-mono text-ink"
           >
-            <DecryptedText
-              text={entry.value}
-              characters={entry.placeholder}
-              animateOn="view"
-              sequential
-              speed={32}
-              maxIterations={8}
-            />
+            <RestoredValue text={entry.value} />
           </mark>,
         );
       } else {
@@ -163,14 +156,7 @@ export function renderRestoredAnswer(
         key={`dev-mark-${i}`}
         className="inline rounded-none bg-marker-amber px-1 py-0.5 font-mono text-ink"
       >
-        <DecryptedText
-          text={hit.value}
-          characters={hit.placeholder}
-          animateOn="view"
-          sequential
-          speed={32}
-          maxIterations={8}
-        />
+        <RestoredValue text={hit.value} />
       </mark>,
     );
     cursor = hit.end;

@@ -123,7 +123,7 @@ The simulated demo needs no account, payment or personal data, and the app inclu
 ## Existing project?
 
 No. This is a new project, created on November 17 and 18, 2026, inside the submission period.
-Pre-existing code it includes: open source npm packages and three UI components copied from Magic UI and React Bits, all listed with their licences in `THIRD_PARTY_NOTICES.md`.
+Pre-existing code it includes: open source npm packages and two MIT UI components copied from Magic UI, all listed with their licences in `THIRD_PARTY_NOTICES.md`.
 
 ## What was verified overnight, and how
 
