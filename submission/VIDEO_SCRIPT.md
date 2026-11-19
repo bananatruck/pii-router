@@ -25,5 +25,6 @@ Do not show the App Check debug token or the Firebase console's API key area.
 - Before recording, run `submission/SETUP_FOR_KESH.md` step 6 once so Gemini Nano is downloaded and the debug token is registered.
 - For the 2:05 shot, record it separately: set `chrome://flags/#prompt-api-for-gemini-nano-multimodal-input` to Disabled, restart Chrome, run the rewrite, then turn the flag back on.
 - `pnpm record:demo` records this walk-through with captions and writes an `.srt` (see `docs/RECORDING.md`); upload the `.srt` in YouTube Studio as the English captions.
+  It records the app page only, so the DevTools Network shots (the cloud payload at 1:05 and the empty log at 1:45) and the blocked shot at 2:05 are recorded separately and cut in.
 - `submission/video/demo-simulated-take.mp4` (local, not committed) is a take of the simulated demo, made on 2026-11-18 so the flow and captions can be checked; it is not the submission video, because the rules require that the project "must function as depicted in the video" and the submission describes the real hybrid path.
 - Title suggestion: "PII Router: Gemini Nano redacts on-device, Gemini in the cloud does the heavy lifting (#BuildHybridAI)".

@@ -163,16 +163,27 @@ export function App({ liveModels }: AppProps = {}) {
     }
   };
 
+  // The confirmation belongs to the answer that was copied: a late write for an older answer must
+  // not mark a newer one as copied, and its reset timer must not clear the newer one (CodeRabbit).
+  const outcomeRef = useRef(outcome);
+  useEffect(() => {
+    outcomeRef.current = outcome;
+  }, [outcome]);
+
   const handleCopyAnswer = async () => {
-    if (outcome?.kind !== 'answered') return;
+    const copiedOutcome = outcome;
+    if (copiedOutcome?.kind !== 'answered') return;
     const writeText = navigator.clipboard?.writeText;
     if (typeof writeText !== 'function') return;
     try {
-      await writeText.call(navigator.clipboard, outcome.answer);
+      await writeText.call(navigator.clipboard, copiedOutcome.answer);
+      if (outcomeRef.current !== copiedOutcome) return;
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      setTimeout(() => {
+        if (outcomeRef.current === copiedOutcome) setCopied(false);
+      }, 1800);
     } catch {
-      setCopied(false);
+      if (outcomeRef.current === copiedOutcome) setCopied(false);
     }
   };
 

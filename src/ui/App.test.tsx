@@ -641,4 +641,21 @@ describe('PII Router UI', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('status-mode').textContent).toContain('Live'));
   });
+
+  it('does not show Copied for a newer answer when an older copy finishes late (CodeRabbit review)', async () => {
+    let resolveWrite: () => void = () => {};
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn(() => new Promise<void>(resolve => { resolveWrite = resolve; })) },
+    });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy' }, { timeout: 10000 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await waitFor(() => expect(screen.getByTestId('run-status').textContent).toBe('Running.'));
+    await waitFor(() => expect(screen.getByTestId('run-status').textContent).not.toBe('Running.'), { timeout: 10000 });
+    resolveWrite();
+    await new Promise(r => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
+  });
 });
