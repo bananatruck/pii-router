@@ -71,6 +71,7 @@ describe('round-2 review: values the patterns claim to catch, in hostile surroun
     ['phone with slashes', 'Call 202/555/0100.', ['202/555/0100']],
     ['card with doubled separators', 'Card 4111--1111--1111--1111.', ['4111--1111--1111--1111']],
     ['international phone with spaced parentheses (CodeRabbit)', 'Call +49 (30) 12345678 today.', ['12345678']],
+    ['7-digit local phone after a label colon', 'Phone:555-0142', ['555-0142']],
     ['7-digit local phone with a dash', 'Call me on 555-0142 tonight.', ['555-0142']],
     ['7-digit local phone with dots', 'Office: 555.0177.', ['555.0177']],
     ['7-digit local phone with a space', 'Ring 555 0163 after six.', ['555 0163']],

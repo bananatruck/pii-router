@@ -25,7 +25,7 @@ const LONG_DIGIT_RUN = /\d(?:[\s./-]{0,3}\d){8,}/g;
  * A 7-digit local phone number (555-0142, 555.0142, 555 0142): three digits, one separator, four
  * digits, standing alone. Under the 9-digit catch-all, so it needs its own rule (round-4 review).
  */
-export const LOCAL_PHONE = /(?<![\w.+$€£/:-])\d{3}[-. ]\d{4}(?![\w/:]|[-.]\d)/g;
+export const LOCAL_PHONE = /(?:(?<![\w.+$€£/:-])|(?<=\p{L}:))\d{3}[-. ]\d{4}(?![\w/:]|[-.]\d)/gu;
 /** On a tie in length, a specific type wins over the generic ID run. */
 const GENERIC_TYPES: ReadonlySet<PiiType> = new Set(['ID']);
 const EMAIL_PATTERN =

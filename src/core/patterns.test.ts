@@ -56,3 +56,10 @@ describe('patterns', () => {
     expect(hits.every((h, i) => i === 0 || h.start >= (hits[i - 1]?.end ?? 0))).toBe(true);
   });
 });
+
+it.each(['Phone:555-0142', 'Office:555.0177', 'Call:555 0163'])('detects a local phone immediately after a label colon: %s', text => {
+  expect(detectPatterns(text)).toEqual([{ type: 'PHONE', value: text.slice(text.indexOf(':') + 1), start: text.indexOf(':') + 1, end: text.length }]);
+});
+it.each(['12:555-0142', '12:555.0177', '12:555 0163', 'v:555-0142/8'])('does not classify a numeric colon fragment as a phone: %s', text => {
+  expect(detectPatterns(text).some(hit => hit.type === 'PHONE')).toBe(false);
+});
