@@ -13,6 +13,7 @@ import type { CSSProperties } from 'react';
 import { motion, type MotionStyle, type Transition } from 'motion/react';
 
 import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/ui/hooks/useMediaQuery';
 
 export interface BorderBeamProps {
   size?: number;
@@ -28,9 +29,6 @@ export interface BorderBeamProps {
   borderWidth?: number;
 }
 
-const prefersReducedMotion = (): boolean =>
-  typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
-
 export const BorderBeam = ({
   className,
   size = 56,
@@ -44,7 +42,8 @@ export const BorderBeam = ({
   initialOffset = 0,
   borderWidth = 2,
 }: BorderBeamProps) => {
-  if (prefersReducedMotion()) {
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  if (reducedMotion) {
     return (
       <div
         aria-hidden="true"
