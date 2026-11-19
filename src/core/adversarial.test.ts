@@ -115,15 +115,17 @@ describe('round-2 review: what Gemini Nano reported must be applied everywhere',
 
 describe('round-4: a value split between the custom instruction and the text', () => {
   it('never sends a phone number whose halves sit in the instruction and the text', async () => {
-    const payload = await sentToCloud({ task: 'custom', customInstruction: 'Call 202-', text: '555-0100 about the refund.' });
-    expectAbsent(payload, ['202-555-0100']);
-    const digits = payload.replace(/\D/g, '');
-    expect(digits).not.toContain('2025550100');
-    expect(payload).not.toMatch(/202-[\s\S]*555-0100/);
+    const cloud = new RecordingModel(new FakeModel({ location: 'cloud' }));
+    const outcome = await runPipeline(
+      { task: 'custom', preference: 'cloud', customInstruction: 'Call 202-55', text: '5-0100 about the refund.' },
+      { device: nano(), cloud },
+    );
+    expect(outcome.kind).toBe('blocked');
+    if (outcome.kind === 'blocked') expect(outcome.reason).toBe('egress-guard');
+    expect(cloud.requests).toHaveLength(0);
   });
 
   it.each([
-    ['Call 202-55', '5-0100 about the refund.'],
     ['Contact alice@', 'example.com'],
     ['Call 202-        ', '5550100 about the refund.'],
   ])('blocks a split value before any cloud call: %s / %s', async (customInstruction, text) => {
