@@ -44,6 +44,5 @@ The rules also require that the submission is "the result of the Entrant's ideas
 ## Decisions you may want to revisit
 
 - Web app rather than Chrome extension: reasons in `docs/SPEC.md` section 1.5.
-- Aceternity UI's licence page says "You cannot re-distribute the Item as a stock image or its source files, regardless of modifications" while allowing use in "end products", including freely distributed ones.
-  A public repository contains the component's source as part of the app, which I read as end-product use, but it is a judgment call; `THIRD_PARTY_NOTICES.md` names the file so it can be swapped out if you disagree.
+- Aceternity UI: its component was removed on 2026-11-18 because the licence forbids re-distributing source files in a public repository; nothing from Aceternity remains.
 - React Bits is "MIT + Commons Clause", which allows use "as part of an application, website, or product" but not selling the component itself; the notice is included.

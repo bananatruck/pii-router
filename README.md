@@ -135,7 +135,7 @@ src/core/            engine: patterns, redaction, guard, routing, fake model (no
 src/models/          Firebase AI Logic clients: on-device (ONLY_ON_DEVICE) and cloud (ONLY_IN_CLOUD)
 src/firebase-config.ts  the one file to edit to connect a Firebase project
 src/ui/              the app
-src/components/vendor/  components from Magic UI, React Bits and Aceternity UI
+src/components/vendor/  components from Magic UI and React Bits
 docs/SPEC.md         the specification: rules as read, data flow, failure behaviour, test plan
 submission/          setup guide, Devpost text, video script, checklist
 ```

@@ -13,12 +13,11 @@ These files were copied from the libraries' public registries on 2026-11-18 and 
 | `src/components/vendor/animated-beam.tsx` | Magic UI | https://magicui.design/r/animated-beam.json | MIT (below) |
 | `src/components/vendor/border-beam.tsx` | Magic UI | https://magicui.design/r/border-beam.json | MIT (below) |
 | `src/components/vendor/decrypted-text.tsx` | React Bits | https://reactbits.dev/r/DecryptedText-TS-TW.json | MIT + Commons Clause (below) |
-| `src/components/vendor/text-generate-effect.tsx` | Aceternity UI | https://ui.aceternity.com/registry/text-generate-effect.json | Aceternity UI licence, https://ui.aceternity.com/licence |
 
-Notes on the two non-MIT licences, for the maintainer to judge:
+Notes on licences beyond plain MIT, for the maintainer to judge:
 
 - React Bits allows use and distribution "as part of an application, website, or product" and forbids selling or redistributing "the components themselves"; here the component is part of the app and is not offered on its own.
-- The Aceternity UI licence allows "end products", including ones that are "freely distributed", and forbids re-distributing an item "as a stock image or its source files"; here the component is part of the app's source. If that reading is judged too generous, replace `text-generate-effect.tsx`, which is a cosmetic reveal effect and nothing depends on it.
+- An Aceternity UI component was used during the build and removed on 2026-11-18, because its licence forbids re-distributing its source files and this repository is public; the cloud reply's reveal is now `src/ui/components/RevealText.tsx`, written for this project.
 
 21st.dev components were also considered, but its registry requires signing in, so none are included.
 
