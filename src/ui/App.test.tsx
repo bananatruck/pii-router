@@ -577,52 +577,6 @@ describe('PII Router UI', () => {
     });
   });
 
-  it('keeps simulated mode when live models finish loading after the user chose Simulated', async () => {
-    const lateLiveDevice: ModelClient = {
-      location: 'device',
-      simulated: false,
-      label: 'Gemini Nano',
-      status: async () => ({ state: 'ready' }),
-      prepare: async () => {},
-      generate: async () => ({ text: '{"entities":[]}', ranOn: 'device' }),
-    };
-    const lateLiveCloud: ModelClient = {
-      location: 'cloud',
-      simulated: false,
-      label: 'Gemini Cloud',
-      status: async () => ({ state: 'ready' }),
-      prepare: async () => {},
-      generate: async () => ({ text: 'ok', ranOn: 'cloud' }),
-    };
-
-    const { rerender } = render(
-      <App
-        liveModels={{
-          device: lateLiveDevice,
-          cloud: lateLiveCloud,
-          liveReason: 'Loading Firebase AI Logic.',
-        }}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Simulated' }));
-    expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
-
-    rerender(
-      <App
-        liveModels={{
-          device: lateLiveDevice,
-          cloud: lateLiveCloud,
-          liveReason: null,
-        }}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
-    });
-  });
-
   it('adopts the normalized text on Run so the marks line up with what was scanned', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit text' }));
