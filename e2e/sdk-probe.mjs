@@ -27,31 +27,37 @@ async function waitForServer(url, timeoutMs) {
 }
 
 const server = spawn('pnpm', ['exec', 'vite', '--port', String(PORT), '--strictPort'], { stdio: ['ignore', 'ignore', 'inherit'] });
-const browser = await chromium.launch();
+let browser = null;
 let exitCode = 0;
 try {
   await waitForServer(URL_, 30000);
+  browser = await chromium.launch();
   const page = await browser.newPage();
   await page.addInitScript(() => {
     delete window.LanguageModel;
   });
   const attempts = [];
+  let phase = 'setup';
   await page.route(/googleapis\.com|google\.com|gstatic\.com/, async (route) => {
     const req = route.request();
-    attempts.push({ at: Date.now(), url: req.url(), carriesPrompt: (req.postData() ?? '').includes(PROMPT_MARKER) });
+    attempts.push({ phase, url: req.url(), carriesPrompt: (req.postData() ?? '').includes(PROMPT_MARKER) });
     await route.abort();
   });
   await page.goto(URL_);
-  const result = await page.evaluate(() => window.__probe);
-  const sdkAttempts = attempts.filter((a) => a.at <= result.afterSdk);
-  const guardedAttempts = attempts.filter((a) => a.at > result.afterSdk);
+  await page.waitForFunction(() => Boolean(window.__probe));
+  const languageModelPresent = await page.evaluate(() => window.__probe.languageModelPresent());
+  phase = 'sdk';
+  const sdkOutcome = await page.evaluate(() => window.__probe.runSdk());
+  phase = 'guarded';
+  const guardedOutcome = await page.evaluate(() => window.__probe.runGuarded());
+  phase = 'done';
   const report = {
     browser: browser.version(),
-    languageModelPresent: result.languageModelPresent,
-    sdkOnlyOnDevice: result.sdk,
-    sdkRequestsCarryingPrompt: sdkAttempts.filter((a) => a.carriesPrompt).map((a) => new URL(a.url).host),
-    guardedModel: result.guarded,
-    guardedRequests: guardedAttempts.length,
+    languageModelPresent,
+    sdkOnlyOnDevice: sdkOutcome,
+    sdkRequestsCarryingPrompt: attempts.filter((a) => a.phase === 'sdk' && a.carriesPrompt).map((a) => new URL(a.url).host),
+    guardedModel: guardedOutcome,
+    guardedRequests: attempts.filter((a) => a.phase === 'guarded').length,
   };
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (report.languageModelPresent) throw new Error('this browser has the Prompt API; the probe needs one without it');
@@ -61,7 +67,10 @@ try {
   process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
   exitCode = 1;
 } finally {
-  await browser.close();
-  server.kill('SIGTERM');
+  try {
+    await browser?.close();
+  } finally {
+    server.kill('SIGTERM');
+  }
 }
 process.exit(exitCode);
