@@ -19,7 +19,7 @@ function print(results) {
 }
 
 function trackedTextFiles() {
-  const out = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' });
+  const out = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
   return out
     .split('\n')
     .filter((p) => /\.(ts|tsx|js|mjs|cjs|json|html|md|ya?ml)$/.test(p) && p !== 'pnpm-lock.yaml')
