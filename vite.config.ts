@@ -1,8 +1,9 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 // PAGES_BASE is set by the GitHub Pages workflow (for example "/pii-router/").
@@ -19,9 +20,24 @@ function firebaseAiBrowserEntry(): string {
   return entry;
 }
 
+/**
+ * Ships the licence and the third-party notices with the built site: the bundled MIT and
+ * MIT-plus-Commons-Clause components require their notices in every copy (CodeRabbit review).
+ */
+function shipNotices(): Plugin {
+  return {
+    name: 'ship-notices',
+    generateBundle() {
+      for (const [from, to] of [['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'], ['LICENSE', 'LICENSE.txt']]) {
+        this.emitFile({ type: 'asset', fileName: to, source: readFileSync(fileURLToPath(new URL(`./${from}`, import.meta.url)), 'utf8') });
+      }
+    },
+  };
+}
+
 export default defineConfig({
   base,
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), shipNotices()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

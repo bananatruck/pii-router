@@ -174,6 +174,12 @@ async function main() {
   try {
     if (preview) await preview.ready;
     else await waitForServer(BASE, 20000);
+    // The bundled MIT components require their notices in every copy, so the site ships them.
+    for (const file of ['THIRD_PARTY_NOTICES.md', 'LICENSE.txt']) {
+      const res = await fetch(new URL(file, BASE), { signal: AbortSignal.timeout(10000) });
+      const body = res.ok ? await res.text() : '';
+      if (!res.ok || !/License|Licence/.test(body)) fail(`${file} is not served with the site`);
+    }
     browser = await chromium.launch();
     for (const viewport of VIEWPORTS) {
       process.stdout.write(`${await checkViewport(browser, viewport)}\n`);
