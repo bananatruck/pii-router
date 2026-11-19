@@ -15,8 +15,12 @@ export function useMediaQuery(query: string): boolean {
     const mql = window.matchMedia(query);
     const sync = () => setMatches(mql.matches);
     sync();
-    mql.addEventListener('change', sync);
-    return () => mql.removeEventListener('change', sync);
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', sync);
+      return () => mql.removeEventListener('change', sync);
+    }
+    mql.addListener(sync);
+    return () => mql.removeListener(sync);
   }, [query]);
 
   return matches;

@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useId, useState, type FC, type RefObject } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 
 import { cn } from '@/lib/utils';
 
@@ -37,9 +37,6 @@ export interface AnimatedBeamProps {
   endYOffset?: number;
 }
 
-const prefersReducedMotion = (): boolean =>
-  typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
-
 export const AnimatedBeam: FC<AnimatedBeamProps> = ({
   className,
   containerRef,
@@ -64,7 +61,7 @@ export const AnimatedBeam: FC<AnimatedBeamProps> = ({
   const id = useId();
   const [pathD, setPathD] = useState('');
   const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 });
-  const reducedMotion = prefersReducedMotion();
+  const reducedMotion = useReducedMotion() === true;
 
   const gradientCoordinates = reverse
     ? {
