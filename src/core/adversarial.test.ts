@@ -121,6 +121,21 @@ describe('round-4: a value split between the custom instruction and the text', (
     expect(payload).not.toMatch(/202-[\s\S]*555-0100/);
   });
 
+  it.each([
+    ['Call 202-55', '5-0100 about the refund.'],
+    ['Contact alice@', 'example.com'],
+    ['Call 202-        ', '5550100 about the refund.'],
+  ])('blocks a split value before any cloud call: %s / %s', async (customInstruction, text) => {
+    const cloud = new RecordingModel(new FakeModel({ location: 'cloud' }));
+    const outcome = await runPipeline(
+      { task: 'custom', preference: 'cloud', customInstruction, text },
+      { device: nano(), cloud },
+    );
+    expect(outcome.kind).toBe('blocked');
+    if (outcome.kind === 'blocked') expect(outcome.reason).toBe('egress-guard');
+    expect(cloud.requests).toHaveLength(0);
+  });
+
   it('still answers when the instruction ends and the text starts with unrelated short numbers', async () => {
     const payload = await sentToCloud({ task: 'custom', customInstruction: 'List the top 3', text: '12 items shipped on 2026-11-18.' });
     expect(payload).toContain('2026-11-18');

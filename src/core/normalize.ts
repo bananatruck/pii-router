@@ -28,6 +28,21 @@ export function normalizeInputDetail(text: string): NormalizeResult {
 
 /** Collapse whitespace and newlines between digit runs and common phone/card separators for egress scanning. */
 export function foldPayloadForScan(text: string): string {
-  const normalized = normalizeInput(text);
-  return normalized.replace(/(?<=[\d.\-\s])[\s\n]+(?=[\d.\-\s])/g, '');
+  return foldSegmentsForScan(text, '', '').text;
+}
+
+/** Fold both segments together and track the join in the resulting string's coordinates. */
+export function foldSegmentsForScan(before: string, after: string, separator: string) {
+  const left = normalizeInput(before);
+  const joined = left + separator + normalizeInput(after);
+  let boundaryStart = left.length;
+  let boundaryEnd = left.length + separator.length;
+  const removedBefore = (start: number, length: number, boundary: number) =>
+    Math.max(0, Math.min(length, boundary - start));
+  const text = joined.replace(/(?<=[\d.\-\s])[\s\n]+(?=[\d.\-\s])/g, (match: string, offset: number) => {
+    boundaryStart -= removedBefore(offset, match.length, left.length);
+    boundaryEnd -= removedBefore(offset, match.length, left.length + separator.length);
+    return '';
+  });
+  return { text, boundaryStart, boundaryEnd };
 }
