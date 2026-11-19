@@ -118,10 +118,15 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
 
   const activeDeviceRef = useRef(device);
   const statusGenerationRef = useRef(0);
+  const pendingStatusRef = useRef<{
+    generation: number;
+    promise: Promise<ModelStatus>;
+  } | null>(null);
 
   useEffect(() => {
     activeDeviceRef.current = device;
     statusGenerationRef.current += 1;
+    return () => { statusGenerationRef.current += 1; };
   }, [device]);
 
   const [deviceStatus, setDeviceStatus] = useState<ModelStatus>(() =>
@@ -137,19 +142,30 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   }, []);
 
   const refreshStatus = useCallback(async (): Promise<ModelStatus> => {
+    // Share a pending read, so polling cannot supersede a slow availability check forever.
+    const pending = pendingStatusRef.current;
+    if (pending?.generation === statusGenerationRef.current) return pending.promise;
     const client = activeDeviceRef.current;
     const generation = ++statusGenerationRef.current;
+    const promise = (async () => {
+      try {
+        const next = await client.status();
+        writeStatusIfCurrent(client, generation, next);
+        return next;
+      } catch {
+        const fallback: ModelStatus = {
+          state: 'unavailable',
+          reason: 'Could not read on-device model status.',
+        };
+        writeStatusIfCurrent(client, generation, fallback);
+        return fallback;
+      }
+    })();
+    pendingStatusRef.current = { generation, promise };
     try {
-      const next = await client.status();
-      writeStatusIfCurrent(client, generation, next);
-      return next;
-    } catch {
-      const fallback: ModelStatus = {
-        state: 'unavailable',
-        reason: 'Could not read on-device model status.',
-      };
-      writeStatusIfCurrent(client, generation, fallback);
-      return fallback;
+      return await promise;
+    } finally {
+      if (pendingStatusRef.current?.generation === generation) pendingStatusRef.current = null;
     }
   }, [writeStatusIfCurrent]);
 
@@ -169,28 +185,8 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
 
   // Read device.status() on load and after mode changes.
   useEffect(() => {
-    let cancelled = false;
-    const client = device;
-    const generation = ++statusGenerationRef.current;
-    void client
-      .status()
-      .then(status => {
-        if (!cancelled) {
-          writeStatusIfCurrent(client, generation, status);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          writeStatusIfCurrent(client, generation, {
-            state: 'unavailable',
-            reason: 'Could not read on-device model status.',
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [device, writeStatusIfCurrent]);
+    void refreshStatus();
+  }, [device, refreshStatus]);
 
   // Poll device.status() every 3 seconds only while it reports downloading.
   useEffect(() => {
