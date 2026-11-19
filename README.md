@@ -103,7 +103,7 @@ The full list, including what it checked and found safe, is in [docs/SPEC.md, se
 
 ## Run it locally
 
-Requirements: Node 22 or later and pnpm.
+Requirements: Node 22.18 or later (or Node 24 LTS), because `pnpm verify:setup` runs a TypeScript file directly, and pnpm.
 
 ```sh
 pnpm install
@@ -118,6 +118,7 @@ To use the real models, follow [submission/SETUP_FOR_KESH.md](submission/SETUP_F
 ## Checks
 
 ```sh
+pnpm exec playwright install chromium   # once, on a fresh machine, for the browser checks
 pnpm check   # lint, type-check, unit tests, production build
 pnpm e2e     # builds, serves and drives the app in the bundled Chromium, saves screenshots
 pnpm record:demo --mode simulated   # records the captioned demo video (docs/RECORDING.md)
