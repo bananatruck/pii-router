@@ -21,6 +21,7 @@ import {
 import { motion, type HTMLMotionProps } from 'motion/react';
 
 const FADE_FLOOR = 0.16;
+const MAX_REVEAL_MS = 1500;
 const FADE_PEAK = 0.62;
 const FADE_LEAD = 6;
 const SETTLE = 'color 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
@@ -162,7 +163,15 @@ export default function DecryptedText({
     !prefersReducedMotion() && (animateOn === 'click' || animateOn === 'view' || animateOn === 'inViewHover');
   const hoverable = animateOn === 'hover' || animateOn === 'inViewHover';
   const local = hoverable && hoverRadius > 0;
-  const step = Math.max(16, speed);
+  const rawStep = Math.max(16, speed);
+  const revealableCount = useMemo(
+    () => chars.filter(char => !isSpace(char)).length,
+    [chars],
+  );
+  const step = useMemo(() => {
+    if (revealableCount === 0) return rawStep;
+    return Math.max(16, Math.min(rawStep, Math.floor(MAX_REVEAL_MS / revealableCount)));
+  }, [rawStep, revealableCount]);
 
   const [frame, setFrame] = useState<Frame>(() => {
     const revealed = chars.map(char => !startsHidden || isSpace(char));
@@ -634,7 +643,7 @@ export default function DecryptedText({
           typeof group === 'string' ? (
             group
           ) : (
-            <span key={group.key} className="whitespace-nowrap">
+            <span key={group.key} className="inline">
               {group.letters.map(index => {
                 const char = chars[index] ?? '';
                 const revealed = frame.revealed[index] ?? true;

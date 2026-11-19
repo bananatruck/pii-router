@@ -36,6 +36,8 @@ function runStatusText(isRunning: boolean, outcome: RunOutcome | null): string {
 }
 
 export function App({ liveModels }: AppProps = {}) {
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+
   const {
     mode,
     setMode,
@@ -47,7 +49,7 @@ export function App({ liveModels }: AppProps = {}) {
     refreshStatus,
     simulateNanoUnavailable,
     setSimulateNanoUnavailable,
-  } = useModels({ liveModels });
+  } = useModels({ liveModels, running: isRunning });
 
   const [text, setText] = useState<string>(SAMPLES[0]?.text ?? '');
   const [debouncedText, setDebouncedText] = useState<string>(SAMPLES[0]?.text ?? '');
@@ -56,7 +58,6 @@ export function App({ liveModels }: AppProps = {}) {
   const [preference, setPreference] = useState<RoutePreference>('auto');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [sampleMenuOpen, setSampleMenuOpen] = useState<boolean>(false);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
   const [outcome, setOutcome] = useState<RunOutcome | null>(null);
   const [activePlaceholder, setActivePlaceholder] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
@@ -135,6 +136,7 @@ export function App({ liveModels }: AppProps = {}) {
     if (runLock.current) return;
     runLock.current = true;
     setIsRunning(true);
+    setSampleMenuOpen(false);
     setIsEditing(false);
     setCopied(false);
     // The pipeline scans normalized text (no invisible characters, NFKC); show that same text so
@@ -163,8 +165,10 @@ export function App({ liveModels }: AppProps = {}) {
 
   const handleCopyAnswer = async () => {
     if (outcome?.kind !== 'answered') return;
+    const writeText = navigator.clipboard?.writeText;
+    if (typeof writeText !== 'function') return;
     try {
-      await navigator.clipboard?.writeText(outcome.answer);
+      await writeText.call(navigator.clipboard, outcome.answer);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -172,7 +176,11 @@ export function App({ liveModels }: AppProps = {}) {
     }
   };
 
-  const payloadCrossed = outcome?.trace.outboundPayload != null;
+  const payloadCrossed =
+    outcome?.kind === 'answered' &&
+    outcome.route !== 'device-only' &&
+    outcome.trace.outboundPayload != null;
+  const payloadCrossedSimulated = mode === 'simulated';
   const egressStep = outcome?.trace.steps.find(s => s.id === 'egress-guard');
 
   return (
@@ -247,6 +255,7 @@ export function App({ liveModels }: AppProps = {}) {
             deviceAnchorRef={deviceAnchorRef}
             cloudAnchorRef={cloudAnchorRef}
             payloadCrossed={payloadCrossed}
+            payloadCrossedSimulated={payloadCrossedSimulated}
             device={{
               isRunning,
               inputTextareaId,

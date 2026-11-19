@@ -62,9 +62,11 @@ Firebase AI Logic is imported and called at runtime in `src/models/firebase-on-d
 The on-device detector uses structured output: the same JSON schema goes to `onDeviceParams.promptOptions.responseConstraint`, and anything that does not parse is rejected.
 `response.inferenceSource` is checked on every on-device call, and a cloud source blocks the run.
 The privacy promise is enforced by tests rather than by trust: a recording cloud model captures the exact string it receives, and for 28 synthetic inputs across every task, no detected value appears in it.
+A second suite of adversarial inputs declares, independently of the detectors, the values that must never appear in that string, so a value the detectors miss fails the test instead of slipping past it.
 Further tests show that when Gemini Nano is unavailable, throws, returns malformed JSON or reports the wrong source, the cloud model is never called.
 Before publishing I had a second model attack the code: Cursor with grok-4.7-high, told to make a personal value reach the cloud, logs, storage or an error.
 It found four real ways (invisible and look-alike characters, a model span lost to an overlap, a race in the on-device check, and a double-click double run), and each is fixed with a test; `docs/SPEC.md` section 8 lists them.
+A later review by GPT 6.1 Sol through Codex found more: numbers hidden by their surroundings (inside a URL, after an extension, split across lines), quoted email addresses, IBANs from countries my table lacked, model findings that were not applied everywhere, and two more ways the SDK could build an on-device model without its on-device adapter; those are fixed with tests too.
 
 I built this overnight by directing AI coding agents, and I want to be plain about it.
 Claude Code (Opus 5.5) acted as tech lead: it read the rules and the Firebase and Chrome docs, wrote the specification, split the work and reviewed and integrated every change.
@@ -121,7 +123,7 @@ The simulated demo needs no account, payment or personal data, and the app inclu
 ## Existing project?
 
 No. This is a new project, created on November 17 and 18, 2026, inside the submission period.
-Pre-existing code it includes: open source npm packages and four UI components copied from Magic UI, React Bits and Aceternity UI, all listed with their licences in `THIRD_PARTY_NOTICES.md`.
+Pre-existing code it includes: open source npm packages and three UI components copied from Magic UI and React Bits, all listed with their licences in `THIRD_PARTY_NOTICES.md`.
 
 ## What was verified overnight, and how
 

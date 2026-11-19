@@ -20,3 +20,9 @@ describe('normalizeInput', () => {
     expect(foldPayloadForScan('(312) 555-\n0142')).toBe('(312) 555-0142');
   });
 });
+
+it('is idempotent when a format character separates characters that NFKC would compose (CodeRabbit)', async () => {
+  const { normalizeInput } = await import('./normalize');
+  const once = normalizeInput('\u1100\u200b\u1161 alice@example.com');
+  expect(normalizeInput(once)).toBe(once);
+});

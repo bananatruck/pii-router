@@ -39,8 +39,9 @@ function placeholdersIn(text: string): Array<{ token: string; type: string }> {
   }));
 }
 
-function sentences(text: string): string[] {
-  return (text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? []).map(s => s.trim()).filter(Boolean);
+/** Sentences end at . ! or ? followed by whitespace, so dots inside emails and numbers do not split. */
+export function sentences(text: string): string[] {
+  return text.trim().split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
 }
 
 function capitalise(text: string): string {
@@ -51,7 +52,7 @@ function rewrite(text: string): string {
   const body = capitalise(
     text
       .trim()
-      .replace(/^(?:hi|hello|hey|dear)\b[^,\n]*,\s*/i, '')
+      .replace(/^(?:hi|hello|hey|dear)\b[^,\n[]*,\s*/i, '') // never drop a placeholder in the greeting
       .replace(/\bI'd\b/g, 'I would')
       .replace(/\bThanks,/g, 'Thank you,'),
   );

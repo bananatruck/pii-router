@@ -23,6 +23,16 @@ const {
   };
 });
 
+// Pin the configuration, so these tests do not depend on what is pasted into src/firebase-config.ts
+// (CodeRabbit review: a filled-in config made the "not configured" test fail).
+vi.mock('../firebase-config', () => ({
+  firebaseConfig: { apiKey: 'PLACEHOLDER_API_KEY', projectId: 'PLACEHOLDER_PROJECT_ID', appId: 'PLACEHOLDER_APP_ID' },
+  recaptchaEnterpriseSiteKey: 'PLACEHOLDER_RECAPTCHA_ENTERPRISE_SITE_KEY',
+  cloudModelName: undefined,
+  isFirebaseConfigured: () => false,
+  isRecaptchaConfigured: () => false,
+}));
+
 vi.mock('firebase/app', () => ({
   initializeApp: mockInitializeApp,
 }));

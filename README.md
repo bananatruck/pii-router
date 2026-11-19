@@ -103,7 +103,7 @@ The full list, including what it checked and found safe, is in [docs/SPEC.md, se
 
 ## Run it locally
 
-Requirements: Node 22 or later and pnpm.
+Requirements: Node 22.18 or later (or Node 24 LTS), because `pnpm verify:setup` runs a TypeScript file directly, and pnpm.
 
 ```sh
 pnpm install
@@ -118,11 +118,14 @@ To use the real models, follow [submission/SETUP_FOR_KESH.md](submission/SETUP_F
 ## Checks
 
 ```sh
+pnpm exec playwright install chromium   # once, on a fresh machine, for the browser checks
 pnpm check   # lint, type-check, unit tests, production build
 pnpm e2e     # builds, serves and drives the app in the bundled Chromium, saves screenshots
+pnpm record:demo --mode simulated   # records the captioned demo video (docs/RECORDING.md)
 ```
 
 The privacy tests (`src/core/privacy.test.ts`) run 28 synthetic inputs through every task and assert on the exact string the cloud model received.
+The adversarial tests (`src/core/adversarial.test.ts`) declare, for hostile inputs, the values that must be absent from that string, independently of what the detectors found.
 All personal data in this repository is synthetic: `example.com`, `.org` and `.net` addresses, reserved or fictional phone numbers (mostly the `555-01xx` range, plus the UK drama range 020 7946 0xxx), RFC 5737 documentation IP addresses, published test card and IBAN numbers, and the voided specimen SSN 078-05-1120.
 
 ## Project layout
@@ -132,7 +135,7 @@ src/core/            engine: patterns, redaction, guard, routing, fake model (no
 src/models/          Firebase AI Logic clients: on-device (ONLY_ON_DEVICE) and cloud (ONLY_IN_CLOUD)
 src/firebase-config.ts  the one file to edit to connect a Firebase project
 src/ui/              the app
-src/components/vendor/  components from Magic UI, React Bits and Aceternity UI
+src/components/vendor/  components from Magic UI and React Bits
 docs/SPEC.md         the specification: rules as read, data flow, failure behaviour, test plan
 submission/          setup guide, Devpost text, video script, checklist
 ```

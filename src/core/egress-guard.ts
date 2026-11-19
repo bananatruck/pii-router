@@ -15,8 +15,12 @@ export function checkEgress(payload: string, vault: Vault): { ok: true } | { ok:
   const options = { allowedPlaceholders: new Set(vault.entries.keys()) };
   const hit = detectPatterns(payload, options)[0] ?? detectPatterns(foldPayloadForScan(payload), options)[0];
   if (hit) return { ok: false, reason: `Remaining ${hit.type} pattern.` };
+  // Generated placeholders can contain a short value as text ("[PERSON_1]" contains "son"); check
+  // the payload with them taken out, so a clean payload is not blocked (CodeRabbit review).
+  let withoutPlaceholders = payload;
+  for (const placeholder of vault.entries.keys()) withoutPlaceholders = withoutPlaceholders.split(placeholder).join(' ');
   for (const { type, value } of vault.entries.values()) {
-    if (vaultValueLeaks(payload, value)) return { ok: false, reason: `Remaining ${type} value.` };
+    if (vaultValueLeaks(withoutPlaceholders, value)) return { ok: false, reason: `Remaining ${type} value.` };
   }
   return { ok: true };
 }

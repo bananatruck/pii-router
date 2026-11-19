@@ -5,6 +5,7 @@
 // or request to a host other than localhost. Saves screenshots to docs/screenshots/.
 //
 // All text used here is the app's own synthetic sample data.
+// On a fresh machine, install the browser once first: pnpm exec playwright install chromium
 
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
@@ -28,11 +29,12 @@ function fail(message) {
   throw new Error(`e2e: ${message}`);
 }
 
+/** For a deployed copy: poll until it answers, each request bounded by the time left. */
 async function waitForServer(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) });
       if (res.ok) return;
     } catch {
       // not up yet
@@ -40,6 +42,36 @@ async function waitForServer(url, timeoutMs) {
     await new Promise((r) => setTimeout(r, 250));
   }
   fail(`server at ${url} did not start`);
+}
+
+/**
+ * Starts `vite preview` and resolves only when that process itself reports it is serving, so a
+ * different server already on the port can never be tested by mistake (CodeRabbit review).
+ */
+function startPreview(timeoutMs) {
+  const child = spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const ready = new Promise((resolve, reject) => {
+    let output = '';
+    const timer = setTimeout(() => reject(new Error(`e2e: vite preview did not start within ${timeoutMs} ms`)), timeoutMs);
+    const onData = (chunk) => {
+      output += chunk.toString();
+      if (output.includes(`localhost:${PORT}`)) {
+        clearTimeout(timer);
+        resolve();
+      }
+    };
+    child.stdout.on('data', onData);
+    child.stderr.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      reject(new Error(`e2e: vite preview exited (code ${code}) before serving; is port ${PORT} in use?\n${output.trim()}`));
+    });
+  });
+  return { child, ready };
 }
 
 async function loadSample(page, label) {
@@ -89,6 +121,18 @@ async function checkViewport(browser, viewport) {
     fail(`${viewport.name}: egress guard status`);
   }
   await page.waitForTimeout(2500); // let the reveal animations finish before the screenshot
+  // The simulated label must stay on screen wherever output is shown, including after scrolling.
+  await page.getByTestId('restored-answer').scrollIntoViewIfNeeded();
+  const bannerBox = await page.getByTestId('simulated-banner').boundingBox();
+  if (!bannerBox || bannerBox.y < 0 || bannerBox.y > 5) fail(`${viewport.name}: simulated banner scrolled out of view`);
+  // Read only what is visible: the reveal animation keeps a screen-reader copy of the final text,
+  // so wait until the visible layer itself shows the restored name (CodeRabbit review).
+  await page.waitForFunction(() => {
+    const node = document.querySelector('[data-testid="restored-answer"]')?.cloneNode(true);
+    if (!node) return false;
+    node.querySelectorAll('.sr-only').forEach((el) => el.remove());
+    return node.textContent.includes('Dana Whitfield');
+  }, null, { timeout: 15000 });
   const answer = await page.getByTestId('restored-answer').innerText();
   if (!answer.includes('Dana Whitfield')) fail(`${viewport.name}: restored answer lacks the restored name`);
   if (!REMOTE) await page.screenshot({ path: new URL(`${viewport.name}-cloud-run.png`, SHOTS).pathname, fullPage: true });
@@ -124,15 +168,19 @@ async function checkViewport(browser, viewport) {
 
 async function main() {
   await mkdir(SHOTS, { recursive: true });
-  const server = REMOTE
-    ? null
-    : spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort'], {
-        stdio: ['ignore', 'ignore', 'inherit'],
-      });
+  const preview = REMOTE ? null : startPreview(20000);
   let exitCode = 0;
-  const browser = await chromium.launch();
+  let browser = null;
   try {
-    await waitForServer(BASE, 20000);
+    if (preview) await preview.ready;
+    else await waitForServer(BASE, 20000);
+    // The bundled MIT components require their notices in every copy, so the site ships them.
+    for (const file of ['THIRD_PARTY_NOTICES.md', 'LICENSE.txt']) {
+      const res = await fetch(new URL(file, BASE), { signal: AbortSignal.timeout(10000) });
+      const body = res.ok ? await res.text() : '';
+      if (!res.ok || !/License|Licence/.test(body)) fail(`${file} is not served with the site`);
+    }
+    browser = await chromium.launch();
     for (const viewport of VIEWPORTS) {
       process.stdout.write(`${await checkViewport(browser, viewport)}\n`);
     }
@@ -140,8 +188,11 @@ async function main() {
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     exitCode = 1;
   } finally {
-    await browser.close();
-    server?.kill('SIGTERM');
+    try {
+      await browser?.close();
+    } finally {
+      preview?.child.kill('SIGTERM');
+    }
   }
   process.exit(exitCode);
 }

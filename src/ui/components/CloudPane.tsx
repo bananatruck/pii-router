@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import type { RunOutcome, TraceStep } from '@/core';
-import { TextGenerateEffect } from '@/components/vendor/text-generate-effect';
+import { RevealText } from './RevealText';
 import { cn } from '@/lib/utils';
 import { renderWithPlaceholderChips } from './PlaceholderChips';
 import { SimulatedTag } from './SimulatedTag';
@@ -45,7 +45,8 @@ export function CloudPane({
       {outcome?.kind === 'blocked' ? (
         <div data-testid="cloud-blocked-panel" className="mt-4 border border-stop-red bg-fog p-4">
           <p className="text-sm font-bold text-stop-red">
-            {outcome.reason === 'detector-wrong-source'
+            {outcome.reason === 'detector-wrong-source' ||
+            outcome.reason === 'device-answer-wrong-source'
               ? 'The text may have left this device.'
               : 'Nothing was sent.'}
           </p>
@@ -109,7 +110,7 @@ export function CloudPane({
                 <span className="text-xs text-ink/75">Returned across boundary</span>
               </div>
               <div data-testid="cloud-reply" className="mt-2 border border-ink bg-fog p-3">
-                <TextGenerateEffect
+                <RevealText
                   words={outcome.trace.cloudReply}
                   renderWord={(word, idx) =>
                     renderWithPlaceholderChips(word, activePlaceholder, setActivePlaceholder).map(

@@ -9,6 +9,7 @@ export interface WorkspaceProps {
   deviceAnchorRef: RefObject<HTMLDivElement | null>;
   cloudAnchorRef: RefObject<HTMLDivElement | null>;
   payloadCrossed: boolean;
+  payloadCrossedSimulated: boolean;
   device: Omit<DevicePaneProps, 'deviceAnchorRef'>;
   cloud: Omit<CloudPaneProps, 'cloudAnchorRef'>;
 }
@@ -18,10 +19,18 @@ export function Workspace({
   deviceAnchorRef,
   cloudAnchorRef,
   payloadCrossed,
+  payloadCrossedSimulated,
   device,
   cloud,
 }: WorkspaceProps) {
   const wideLayout = useMediaQuery('(min-width: 768px)');
+
+  const crossedLabelDesktop = payloadCrossedSimulated
+    ? 'redacted payload passed to the simulated cloud'
+    : 'redacted payload crossed →';
+  const crossedLabelMobile = payloadCrossedSimulated
+    ? 'redacted payload passed to the simulated cloud'
+  : 'redacted payload crossed ↓';
 
   return (
     <div ref={workspaceRef} className="relative">
@@ -32,8 +41,11 @@ export function Workspace({
             Trust boundary
           </span>
           {payloadCrossed && (
-            <span className="border border-boundary-blue bg-fog px-2 py-0.5 font-mono text-[11px] font-semibold text-boundary-blue">
-              redacted payload crossed &rarr;
+            <span
+              data-testid="payload-crossed-tag"
+              className="border border-boundary-blue bg-fog px-2 py-0.5 font-mono text-[11px] font-semibold text-boundary-blue"
+            >
+              {crossedLabelDesktop}
             </span>
           )}
           <div className="h-px flex-1 bg-ink/30" />
@@ -48,8 +60,11 @@ export function Workspace({
             Trust boundary
           </span>
           {payloadCrossed && (
-            <span className="z-10 border border-fog bg-boundary-blue px-2 py-0.5 font-mono text-[11px] font-semibold text-fog md:hidden">
-              redacted payload crossed &darr;
+            <span
+              data-testid="payload-crossed-tag-mobile"
+              className="z-10 border border-fog bg-boundary-blue px-2 py-0.5 font-mono text-[11px] font-semibold text-fog md:hidden"
+            >
+              {crossedLabelMobile}
             </span>
           )}
         </div>

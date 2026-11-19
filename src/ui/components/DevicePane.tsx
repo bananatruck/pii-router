@@ -87,6 +87,7 @@ export function DevicePane({
               id={inputTextareaId}
               aria-label="Input text"
               rows={5}
+              disabled={isRunning}
               value={text}
               onChange={e => {
                 setText(e.target.value);
@@ -109,7 +110,9 @@ export function DevicePane({
         ) : (
           <div
             data-testid="marked-input"
-            onClick={() => setIsEditing(true)}
+            onClick={() => {
+              if (!isRunning) setIsEditing(true);
+            }}
             className="mt-2 min-h-[124px] cursor-text border border-ink bg-fog p-3 font-mono text-sm leading-relaxed text-ink whitespace-pre-wrap"
           >
             {text ? (

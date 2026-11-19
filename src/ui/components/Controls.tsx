@@ -88,6 +88,12 @@ export function Controls({
   }, [sampleMenuOpen]);
 
   useEffect(() => {
+    if (isRunning && sampleMenuOpen) {
+      closeSampleMenu(false);
+    }
+  }, [isRunning, sampleMenuOpen, closeSampleMenu]);
+
+  useEffect(() => {
     if (!sampleMenuOpen) return;
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -213,8 +219,9 @@ export function Controls({
                   key={sample.id}
                   type="button"
                   role="menuitem"
+                  disabled={isRunning}
                   onClick={() => handleSelectSample(sample)}
-                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-ink hover:bg-device-sage"
+                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-ink hover:bg-device-sage disabled:cursor-wait disabled:opacity-60"
                 >
                   {sample.label}
                 </button>

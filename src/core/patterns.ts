@@ -85,7 +85,8 @@ export function detectPatterns(text: string, options: DetectOptions = {}): Patte
   scan('IP', /(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w]|\.\d)/g, s => s.split('.').every(o => Number(o) <= 255));
   scan('PHONE', NA_PHONE_SEPARATED);
   scan('PHONE', NA_PHONE_COMPACT);
-  scan('PHONE', /(?<![\w+$€£])\+[1-9]\d(?:[ ()-]?\d){6,13}(?![\w]|[ ()-]\d)/g, s => {
+  // Up to two separators between digits, so "+49 (30) 12345678" matches (CodeRabbit review).
+  scan('PHONE', /(?<![\w+$€£])\+[1-9]\d(?:[ ()-]{0,2}\d){6,13}(?![\w]|[ ()-]{1,2}\d)/g, s => {
     const count = s.replace(/\D/g, '').length;
     return count >= 8 && count <= 15;
   });

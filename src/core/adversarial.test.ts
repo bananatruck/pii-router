@@ -70,6 +70,7 @@ describe('round-2 review: values the patterns claim to catch, in hostile surroun
     ['SSN on three lines', 'SSN 078\n05\n1120.', ['078 05 1120']],
     ['phone with slashes', 'Call 202/555/0100.', ['202/555/0100']],
     ['card with doubled separators', 'Card 4111--1111--1111--1111.', ['4111--1111--1111--1111']],
+    ['international phone with spaced parentheses (CodeRabbit)', 'Call +49 (30) 12345678 today.', ['12345678']],
   ])('%s', async (_name, text, values) => {
     expectAbsent(await sentToCloud({ text }), values);
   });

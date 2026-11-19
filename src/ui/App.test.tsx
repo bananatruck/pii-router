@@ -6,7 +6,30 @@ import { FakeModel, type ModelClient } from '@/core';
 import { App } from './App';
 import type { LiveModelSet } from './useModels';
 
+// Pin the configuration, so these tests do not depend on src/firebase-config.ts (CodeRabbit review:
+// a filled-in config made the app start in Live and broke the simulated-mode tests).
+const liveConfig = vi.hoisted(() => ({ problem: 'Firebase is not configured yet (test).' as string | null }));
+vi.mock('@/models/live-config', () => ({
+  liveConfigProblem: () => liveConfig.problem,
+  isLocalhostDev: () => true,
+}));
+vi.mock('@/models', () => ({
+  createLiveModels: () => ({
+    device: {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano (test)',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async () => ({ text: '{"entities":[]}', ranOn: 'device' }),
+    },
+    cloud: null,
+    liveReason: null,
+  }),
+}));
+
 afterEach(() => {
+  liveConfig.problem = 'Firebase is not configured yet (test).';
   cleanup();
   vi.useRealTimers();
 });
@@ -356,6 +379,250 @@ describe('PII Router UI', () => {
     });
   });
 
+  it('shows wrong-source cloud copy when the device-only answer reports wrong inference', async () => {
+    let generateCalls = 0;
+    const deviceOnlyWrongAnswer: ModelClient = {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async request => {
+        generateCalls += 1;
+        if (request.responseSchema) {
+          return { text: '{"entities":[]}', ranOn: 'device' };
+        }
+        return { text: 'Local answer.', ranOn: 'cloud' };
+      },
+    };
+    const cloud = new FakeModel({ location: 'cloud' });
+
+    render(
+      <App
+        liveModels={{
+          device: deviceOnlyWrongAnswer,
+          cloud,
+          liveReason: null,
+        }}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Task'), { target: { value: 'summarize' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Keep on this device' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cloud-blocked-panel').textContent).toContain(
+        'The text may have left this device.',
+      );
+    });
+    expect(screen.getByTestId('cloud-blocked-panel').textContent).not.toContain('Nothing was sent.');
+    expect(generateCalls).toBeGreaterThan(1);
+  });
+
+  it('shows simulated payload-crossed copy only after a successful cloud answer', async () => {
+    vi.useFakeTimers();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await vi.advanceTimersByTimeAsync(1500);
+
+    const tag = screen.getByTestId('payload-crossed-tag');
+    expect(tag.textContent).toContain('redacted payload passed to the simulated cloud');
+  });
+
+  it('hides payload-crossed tags when the cloud call errors', async () => {
+    const flakyCloud: ModelClient = {
+      location: 'cloud',
+      simulated: false,
+      label: 'Gemini Cloud',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async request => {
+        if (request.responseSchema) {
+          throw new Error('should not run on cloud');
+        }
+        throw new Error('503');
+      },
+    };
+    const device = new FakeModel({ location: 'device' });
+
+    render(
+      <App
+        liveModels={{
+          device,
+          cloud: flakyCloud,
+          liveReason: null,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('outbound-payload')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('payload-crossed-tag')).toBeNull();
+  });
+
+  it('closes the sample menu when a run starts and keeps menu items disabled while running', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const slowDevice: ModelClient = {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async request => {
+        if (request.responseSchema) {
+          await gate;
+          return { text: '{"entities":[]}', ranOn: 'device' };
+        }
+        return { text: 'Local summary output.', ranOn: 'device' };
+      },
+    };
+    render(<App liveModels={{ device: slowDevice, cloud: null, liveReason: null }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    expect(screen.getByRole('menu')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).toBeNull();
+    });
+    expect(screen.getByRole('button', { name: 'Use sample' }).hasAttribute('disabled')).toBe(true);
+    release();
+  });
+
+  it('does not open the text editor from the marked view while a run is in flight', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const slowDevice: ModelClient = {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async request => {
+        if (request.responseSchema) {
+          await gate;
+          return { text: '{"entities":[]}', ranOn: 'device' };
+        }
+        return { text: 'Local summary output.', ranOn: 'device' };
+      },
+    };
+    const stubCloud: ModelClient = {
+      location: 'cloud',
+      simulated: false,
+      label: 'Gemini Cloud',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async () => ({ text: 'Reply.', ranOn: 'cloud' }),
+    };
+    render(<App liveModels={{ device: slowDevice, cloud: stubCloud, liveReason: null }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Edit text' }).hasAttribute('disabled')).toBe(true);
+    });
+    fireEvent.click(screen.getByTestId('marked-input'));
+    expect(screen.queryByLabelText('Input text')).toBeNull();
+
+    release();
+    await screen.findByTestId('restored-answer');
+  });
+
+  it('sets copied only after clipboard write resolves', async () => {
+    let resolveWrite: () => void = () => {};
+    const writeSpy = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolveWrite = resolve;
+        }),
+    );
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: writeSpy },
+    });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await vi.advanceTimersByTimeAsync(1500);
+
+    // Wait for the answer rather than trusting a fixed delay; the full suite runs under load.
+    const copyButton = await screen.findByRole('button', { name: 'Copy' }, { timeout: 10000 });
+    fireEvent.click(copyButton);
+    expect(writeSpy).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
+    resolveWrite();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
+    });
+  });
+
+  it('keeps simulated mode when live models finish loading after the user chose Simulated', async () => {
+    const lateLiveDevice: ModelClient = {
+      location: 'device',
+      simulated: false,
+      label: 'Gemini Nano',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async () => ({ text: '{"entities":[]}', ranOn: 'device' }),
+    };
+    const lateLiveCloud: ModelClient = {
+      location: 'cloud',
+      simulated: false,
+      label: 'Gemini Cloud',
+      status: async () => ({ state: 'ready' }),
+      prepare: async () => {},
+      generate: async () => ({ text: 'ok', ranOn: 'cloud' }),
+    };
+
+    const { rerender } = render(
+      <App
+        liveModels={{
+          device: lateLiveDevice,
+          cloud: lateLiveCloud,
+          liveReason: 'Loading Firebase AI Logic.',
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Simulated' }));
+    expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
+
+    rerender(
+      <App
+        liveModels={{
+          device: lateLiveDevice,
+          cloud: lateLiveCloud,
+          liveReason: null,
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-mode').textContent).toContain('Simulated');
+    });
+  });
+
   it('adopts the normalized text on Run so the marks line up with what was scanned', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit text' }));
@@ -367,5 +634,11 @@ describe('PII Router UI', () => {
     const marked = screen.getByTestId('marked-input');
     expect(marked.textContent).toContain('4111111111111111');
     expect(marked.querySelector('mark')?.textContent ?? '').toContain('4111111111111111');
+  });
+
+  it('switches to Live once the live models load when the user has not picked a mode', async () => {
+    liveConfig.problem = null;
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('status-mode').textContent).toContain('Live'));
   });
 });

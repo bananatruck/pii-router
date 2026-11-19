@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FakeModel, type ModelClient, type ModelStatus } from '@/core';
 import { liveConfigProblem } from '@/models/live-config';
 
@@ -31,6 +31,7 @@ function unavailableLiveSet(reason: string): LiveModelSet {
 
 export interface UseModelsOptions {
   liveModels?: LiveModelSet;
+  running?: boolean;
 }
 
 export interface UseModelsResult {
@@ -48,6 +49,7 @@ export interface UseModelsResult {
 
 export function useModels(options?: UseModelsOptions): UseModelsResult {
   const injected = options?.liveModels;
+  const running = options?.running ?? false;
   // Checked without the Firebase SDK. Only when live mode is possible is src/models (and the SDK)
   // loaded, so the simulated demo never downloads or runs Firebase code.
   const configProblem = useMemo(() => (injected ? null : liveConfigProblem()), [injected]);
@@ -78,6 +80,14 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
     live.liveReason === null ? 'live' : 'simulated',
   );
 
+  const userPickedModeRef = useRef(userPickedMode);
+  const runningRef = useRef(running);
+
+  useEffect(() => {
+    userPickedModeRef.current = userPickedMode;
+    runningRef.current = running;
+  }, [userPickedMode, running]);
+
   useEffect(() => {
     if (injected || configProblem !== null) {
       return;
@@ -88,7 +98,11 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
         if (cancelled) return;
         const set = models.createLiveModels();
         setLoadedLive(set);
-        if (set.liveReason === null && !userPickedMode) setModeState('live');
+        // Switch to Live only if the user has not chosen a mode and no run is in flight; the app
+        // starts in Simulated while this import is pending, so the current mode is not a condition.
+        if (set.liveReason === null && !userPickedModeRef.current && !runningRef.current) {
+          setModeState('live');
+        }
       })
       .catch(() => {
         if (!cancelled) setLoadedLive(unavailableLiveSet('Firebase AI Logic could not be loaded.'));
@@ -96,13 +110,17 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
     return () => {
       cancelled = true;
     };
-    // userPickedMode is read once when the module arrives; it must not re-trigger the import.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [injected, configProblem]);
 
   const activeMode: AppMode = live.liveReason !== null && mode === 'live' ? 'simulated' : mode;
   const device = activeMode === 'live' ? live.device : simulated.device;
   const cloud = activeMode === 'live' ? live.cloud : simulated.cloud;
+
+  const activeDeviceRef = useRef(device);
+
+  useEffect(() => {
+    activeDeviceRef.current = device;
+  }, [device]);
 
   const [deviceStatus, setDeviceStatus] = useState<ModelStatus>(() =>
     activeMode === 'simulated'
@@ -110,23 +128,33 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
       : { state: 'unavailable', reason: live.liveReason ?? 'Checking model status.' },
   );
 
-  const refreshStatus = useCallback(async (): Promise<ModelStatus> => {
-    try {
-      const next = await device.status();
+  const writeStatusIfCurrent = useCallback((client: ModelClient, next: ModelStatus) => {
+    if (client === activeDeviceRef.current) {
       setDeviceStatus(next);
+    }
+  }, []);
+
+  const refreshStatus = useCallback(async (): Promise<ModelStatus> => {
+    const client = activeDeviceRef.current;
+    try {
+      const next = await client.status();
+      writeStatusIfCurrent(client, next);
       return next;
     } catch {
       const fallback: ModelStatus = {
         state: 'unavailable',
         reason: 'Could not read on-device model status.',
       };
-      setDeviceStatus(fallback);
+      writeStatusIfCurrent(client, fallback);
       return fallback;
     }
-  }, [device]);
+  }, [writeStatusIfCurrent]);
 
   const setMode = useCallback(
     (next: AppMode) => {
+      if (runningRef.current) {
+        return;
+      }
       if (next === 'live' && live.liveReason !== null) {
         return;
       }
@@ -139,16 +167,17 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   // Read device.status() on load and after mode changes.
   useEffect(() => {
     let cancelled = false;
-    void device
+    const client = device;
+    void client
       .status()
       .then(status => {
         if (!cancelled) {
-          setDeviceStatus(status);
+          writeStatusIfCurrent(client, status);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setDeviceStatus({
+          writeStatusIfCurrent(client, {
             state: 'unavailable',
             reason: 'Could not read on-device model status.',
           });
@@ -157,7 +186,7 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
     return () => {
       cancelled = true;
     };
-  }, [device]);
+  }, [device, writeStatusIfCurrent]);
 
   // Poll device.status() every 3 seconds only while it reports downloading.
   useEffect(() => {
@@ -174,13 +203,18 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
 
   // Call device.prepare(onProgress) directly in the click handler to preserve the user gesture.
   const prepareDevice = useCallback(() => {
-    const promise = device.prepare((fraction: number) => {
-      setDeviceStatus({ state: 'downloading', fraction });
+    const client = activeDeviceRef.current;
+    const promise = client.prepare((fraction: number) => {
+      writeStatusIfCurrent(client, { state: 'downloading', fraction });
     });
     void promise
-      .then(() => refreshStatus())
-      .catch(() => refreshStatus());
-  }, [device, refreshStatus]);
+      .then(() => {
+        if (client === activeDeviceRef.current) void refreshStatus();
+      })
+      .catch(() => {
+        if (client === activeDeviceRef.current) void refreshStatus();
+      });
+  }, [refreshStatus, writeStatusIfCurrent]);
 
   return {
     mode: activeMode,

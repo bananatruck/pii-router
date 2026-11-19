@@ -185,7 +185,7 @@ describe('FirebaseOnDeviceModel', () => {
     expect(mockGenerateContent).not.toHaveBeenCalled();
   });
 
-  it('creates a fresh model for every call so a model built without the Prompt API is never reused', async () => {
+  it('reuses a model per schema so the SDK can destroy its previous Prompt API session (CodeRabbit review)', async () => {
     mockAvailability.mockResolvedValue('available');
     mockGenerateContent.mockResolvedValue({
       response: { text: () => '{"entities":[]}', inferenceSource: 'on_device' },
@@ -193,7 +193,21 @@ describe('FirebaseOnDeviceModel', () => {
     const model = new FirebaseOnDeviceModel(fakeAI);
     await model.generate({ prompt: 'one' });
     await model.generate({ prompt: 'two' });
+    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a cached model that has no on-device adapter and never calls it', async () => {
+    mockAvailability.mockResolvedValue('available');
+    mockGenerateContent.mockResolvedValue({
+      response: { text: () => '{"entities":[]}', inferenceSource: 'on_device' },
+    });
+    mockGetGenerativeModel.mockImplementationOnce(() => ({ generateContent: mockGenerateContent, initializeDeviceModel: mockInitializeDeviceModel }));
+    const model = new FirebaseOnDeviceModel(fakeAI);
+    await expect(model.generate({ prompt: 'one' })).rejects.toMatchObject({ code: 'device-unavailable' });
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    await model.generate({ prompt: 'two' });
     expect(mockGetGenerativeModel).toHaveBeenCalledTimes(2);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
   });
 
   it('refuses and never calls generateContent when the created model has no on-device adapter', async () => {

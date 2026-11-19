@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { checkConfig, checkNoDebugToken, findVerifyMarkers, parseFirebaseConfig } from './check-setup';
 
@@ -49,7 +51,8 @@ export const firebaseConfig = {
   it('fails when a debug token string is assigned in a tracked file', () => {
     const files = [
       { path: 'src/models/firebase-app.ts', text: 'self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;' },
-      { path: 'src/leak.ts', text: "self.FIREBASE_APPCHECK_DEBUG_TOKEN = '00000000-0000-4000-8000-000000000000';" },
+      // Built from parts so this file's own source does not match the scan it tests.
+      { path: 'src/leak.ts', text: ['self.FIREBASE_APPCHECK_DEBUG_TOKEN', " = '00000000-0000-4000-8000-000000000000';"].join('') },
     ];
     expect(checkNoDebugToken(files)).toEqual([expect.objectContaining({ level: 'fail', message: expect.stringContaining('src/leak.ts') })]);
     expect(checkNoDebugToken(files.slice(0, 1))[0]?.level).toBe('pass');
@@ -66,5 +69,13 @@ export const firebaseConfig = {
       expect.objectContaining({ line: 3, settledBy: expect.stringContaining('step 6 as a whole') }),
       expect.objectContaining({ line: 4, settledBy: expect.stringContaining('Network tab') }),
     ]);
+  });
+
+  it('the repository passes its own debug-token check (CodeRabbit review)', () => {
+    const files = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
+      .split('\n')
+      .filter(p => /\.(ts|tsx|js|mjs|json|md)$/.test(p))
+      .map(p => ({ path: p, text: readFileSync(p, 'utf8') }));
+    expect(checkNoDebugToken(files)[0]?.level).toBe('pass');
   });
 });

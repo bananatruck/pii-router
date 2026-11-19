@@ -3,12 +3,12 @@
 This takes about 30 minutes of your time; the Gemini Nano download runs in the background.
 Every step names the page it comes from.
 Nothing here costs money: the Gemini Developer API provider is used at no cost within its limits, and Gemini Nano runs on your machine.
-Work in `~/Documents/Projects/hackathons/pii-router` (Node 22 or later and pnpm; `node_modules` is already installed there).
+Work in `~/Documents/Projects/hackathons/pii-router` (Node 22.18 or later (or Node 24 LTS), because `pnpm verify:setup` runs a TypeScript file directly, and pnpm; `node_modules` is already installed there).
 
 ## Fast path
 
 1. Run `pnpm verify:setup`. On 2026-11-18 it reported two blockers: the placeholder config, and 6.4 GB free on the volume with your Chrome profile (Flatpak Chrome, `~/.var/app/com.google.Chrome`), where Chrome needs at least 22 GB free before it downloads Gemini Nano. Free about 16 GB first.
-2. Start the Gemini Nano download early (step 5), because it is the long wait.
+2. Start the Gemini Nano download early, because it is the long wait: run `pnpm dev` (it serves `http://localhost:5173`, which step 5 needs), then do step 5.
 3. Do steps 1 to 4 while it downloads.
 4. Run `pnpm verify:setup` again until it says "ready for the real run". It checks the pasted config offline (it never prints the API key and makes no network request), checks that no App Check debug token was committed, re-checks the disk, and lists the `[VERIFY AFTER REAL RUN]` markers in `submission/DEVPOST.md` with the step that settles each.
 5. Do step 6 and update those markers with what you saw.
@@ -77,7 +77,7 @@ Docs: https://firebase.google.com/docs/ai-logic/hybrid/web/get-started (Step 1) 
 4. Check independently: DevTools > Network, filter `firebasevertexai`, open the `generateContent` request, and read its payload.
    It must contain the placeholders and none of the sample's name, email, phone or card number.
    Also check that no request to that host was made during the Gemini Nano step.
-5. Switch the task to "Summarize": with Gemini Nano ready, Auto keeps it on the device, and the Network tab must show no `firebasevertexai` request at all.
+5. Clear the Network log (the rewrite left a request in it), then switch the task to "Summarize" and Run: with Gemini Nano ready, Auto keeps it on the device, and the Network tab must show no `firebasevertexai` request at all.
 6. Fail-closed check: set the Chrome flag to Disabled (not Default, which may still leave the API on), restart, reload, and run the rewrite again.
    The app must say it is blocked because Gemini Nano is unavailable, and the Network tab must show no `generateContent` request.
    Turn the flag back on afterwards.
