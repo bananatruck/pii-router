@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { getGenerativeModel as sdkGetGenerativeModel } from 'firebase/ai';
 
 const {
   mockGenerateContent,
@@ -9,7 +10,7 @@ const {
 } = vi.hoisted(() => {
   const generateContent = vi.fn();
   const initializeDeviceModel = vi.fn();
-  const getGenerativeModel = vi.fn((): Record<string, unknown> => ({
+  const getGenerativeModel = vi.fn<(...args: Parameters<typeof sdkGetGenerativeModel>) => Record<string, unknown>>(() => ({
     generateContent,
     initializeDeviceModel,
     chromeAdapter: { mode: 'only_on_device' },
@@ -102,6 +103,7 @@ describe('FirebaseOnDeviceModel', () => {
       mode: 'only_on_device',
       onDeviceParams: {
         createOptions: {
+          signal: expect.any(AbortSignal),
           expectedInputs: [{ type: 'text', languages: ['en'] }],
           expectedOutputs: [{ type: 'text', languages: ['en'] }],
         },
@@ -185,18 +187,21 @@ describe('FirebaseOnDeviceModel', () => {
     expect(mockGenerateContent).not.toHaveBeenCalled();
   });
 
-  it('reuses a model per schema so the SDK can destroy its previous Prompt API session (CodeRabbit review)', async () => {
+  it.each([false, true])('aborts the session signal when generation finishes, failure=%s', async fails => {
     mockAvailability.mockResolvedValue('available');
-    mockGenerateContent.mockResolvedValue({
-      response: { text: () => '{"entities":[]}', inferenceSource: 'on_device' },
-    });
+    if (fails) mockGenerateContent.mockRejectedValueOnce(new Error('Synthetic failure'));
+    else mockGenerateContent.mockResolvedValueOnce({ response: { text: () => 'Answer', inferenceSource: 'on_device' } });
     const model = new FirebaseOnDeviceModel(fakeAI);
-    await model.generate({ prompt: 'one' });
-    await model.generate({ prompt: 'two' });
-    expect(mockGetGenerativeModel).toHaveBeenCalledTimes(1);
+    const pending = model.generate({ prompt: 'Synthetic text' });
+    if (fails) await expect(pending).rejects.toThrow('Synthetic failure');
+    else await expect(pending).resolves.toMatchObject({ text: 'Answer' });
+    const params = mockGetGenerativeModel.mock.calls[0]?.[1];
+    const signal = params && 'onDeviceParams' in params ? params.onDeviceParams?.createOptions?.signal : undefined;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(true);
   });
 
-  it('drops a cached model that has no on-device adapter and never calls it', async () => {
+  it('rejects a missing adapter and creates a fresh model for the next call', async () => {
     mockAvailability.mockResolvedValue('available');
     mockGenerateContent.mockResolvedValue({
       response: { text: () => '{"entities":[]}', inferenceSource: 'on_device' },

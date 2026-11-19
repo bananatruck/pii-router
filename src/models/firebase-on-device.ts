@@ -77,34 +77,10 @@ export class FirebaseOnDeviceModel implements ModelClient {
     return this.explicitAI ?? getOrCreateLocalAI();
   }
 
-  /** One model per schema, reused so the SDK destroys each previous Prompt API session itself. */
-  private readonly models = new Map<string, GenerativeModel>();
+  // Keep the download adapter alive while Chrome downloads the model in the background.
+  private downloadModel: GenerativeModel | null = null;
 
-  /**
-   * Returns the cached model for this schema, or builds one, and refuses either unless it has an
-   * on-device adapter. The adapter check runs on every call, so a model the SDK built without one
-   * is dropped and never used; caching is therefore safe (CodeRabbit review: building a new model
-   * per call left each call's Prompt API session alive until garbage collection).
-   */
-  private modelFor(schema?: JsonSchema): GenerativeModel {
-    const key = schema ? JSON.stringify(schema) : '';
-    const model = this.models.get(key) ?? this.createModel(schema);
-    try {
-      this.assertOnDeviceAdapter(model);
-    } catch (err) {
-      this.models.delete(key);
-      throw err;
-    }
-    this.models.set(key, model);
-    return model;
-  }
-
-  /**
-   * The SDK decides at creation time whether the model gets an on-device adapter; a model created
-   * while LanguageModel was missing would send every later prompt to the cloud (docs/SPEC.md
-   * section 2.2), which is why modelFor checks the adapter before every use.
-   */
-  private createModel(schema?: JsonSchema): GenerativeModel {
+  private createModel(schema?: JsonSchema, signal?: AbortSignal): GenerativeModel {
     const ai = this.resolveAI();
 
     // https://firebase.google.com/docs/ai-logic/hybrid/web/configuration-options
@@ -115,6 +91,7 @@ export class FirebaseOnDeviceModel implements ModelClient {
       mode: InferenceMode.ONLY_ON_DEVICE,
       onDeviceParams: {
         createOptions: {
+          ...(signal ? { signal } : {}),
           expectedInputs: ON_DEVICE_EXPECTED_OPTIONS.expectedInputs,
           expectedOutputs: ON_DEVICE_EXPECTED_OPTIONS.expectedOutputs,
         },
@@ -128,6 +105,7 @@ export class FirebaseOnDeviceModel implements ModelClient {
       },
     });
 
+    this.assertOnDeviceAdapter(model);
     return model;
   }
 
@@ -166,7 +144,9 @@ export class FirebaseOnDeviceModel implements ModelClient {
     }
 
     this.assertPromptApiPresent();
-    const defaultModel = this.modelFor(undefined);
+    const defaultModel = this.downloadModel ?? this.createModel();
+    this.assertOnDeviceAdapter(defaultModel);
+    this.downloadModel = defaultModel;
 
     // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
     // "You must call initializeDeviceModel() after or on an end-user page interaction (like a button click) and before you send a prompt request to the model."
@@ -183,25 +163,31 @@ export class FirebaseOnDeviceModel implements ModelClient {
       throw createDeviceUnavailableError(modelStatus.reason);
     }
     this.assertPromptApiPresent();
-    const model = this.modelFor(request.responseSchema);
+    const controller = new AbortController();
+    try {
+      const model = this.createModel(request.responseSchema, controller.signal);
 
-    // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
-    // "To generate text output, call generateContent with the text input: const result = await model.generateContent(prompt);"
-    const result = await model.generateContent(request.prompt);
-    const response = result.response;
+      // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
+      // "To generate text output, call generateContent with the text input: const result = await model.generateContent(prompt);"
+      const result = await model.generateContent(request.prompt);
+      const response = result.response;
 
-    // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
-    // "const text = response.text();"
-    const text = response.text();
+      // https://firebase.google.com/docs/ai-logic/hybrid/web/get-started
+      // "const text = response.text();"
+      const text = response.text();
 
-    // https://firebase.google.com/docs/ai-logic/hybrid/web/configuration-options
-    // "This information is provided by the inferenceSource property of each response (available starting with JS SDK v12.5.0)."
-    const ranOn =
-      response.inferenceSource === InferenceSource.ON_DEVICE ? 'device' : 'cloud';
+      // https://firebase.google.com/docs/ai-logic/hybrid/web/configuration-options
+      // "This information is provided by the inferenceSource property of each response (available starting with JS SDK v12.5.0)."
+      const ranOn =
+        response.inferenceSource === InferenceSource.ON_DEVICE ? 'device' : 'cloud';
 
-    return {
-      text,
-      ranOn,
-    };
+      return {
+        text,
+        ranOn,
+      };
+    } finally {
+      // Chrome destroys the Prompt API session when its creation signal is aborted.
+      controller.abort();
+    }
   }
 }
