@@ -118,6 +118,7 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
 
   const activeDeviceRef = useRef(device);
   const statusGenerationRef = useRef(0);
+  const preparationGenerationRef = useRef(0);
   const pendingStatusRef = useRef<{
     generation: number;
     promise: Promise<ModelStatus>;
@@ -126,7 +127,11 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   useEffect(() => {
     activeDeviceRef.current = device;
     statusGenerationRef.current += 1;
-    return () => { statusGenerationRef.current += 1; };
+    preparationGenerationRef.current += 1;
+    return () => {
+      statusGenerationRef.current += 1;
+      preparationGenerationRef.current += 1;
+    };
   }, [device]);
 
   const [deviceStatus, setDeviceStatus] = useState<ModelStatus>(() =>
@@ -204,18 +209,22 @@ export function useModels(options?: UseModelsOptions): UseModelsResult {
   // Call device.prepare(onProgress) directly in the click handler to preserve the user gesture.
   const prepareDevice = useCallback(() => {
     const client = activeDeviceRef.current;
-    const generation = ++statusGenerationRef.current;
+    const generation = ++preparationGenerationRef.current;
+    const isCurrent = () => client === activeDeviceRef.current && generation === preparationGenerationRef.current;
+    // A pre-download read must not replace preparation progress. Polling has its own generation.
+    statusGenerationRef.current += 1;
     const promise = client.prepare((fraction: number) => {
-      writeStatusIfCurrent(client, generation, { state: 'downloading', fraction });
+      if (isCurrent()) setDeviceStatus({ state: 'downloading', fraction });
     });
-    void promise
-      .then(() => {
-        if (client === activeDeviceRef.current && generation === statusGenerationRef.current) void refreshStatus();
-      })
-      .catch(() => {
-        if (client === activeDeviceRef.current && generation === statusGenerationRef.current) void refreshStatus();
-      });
-  }, [refreshStatus, writeStatusIfCurrent]);
+    const refreshAfterPreparation = () => {
+      if (!isCurrent()) return;
+      preparationGenerationRef.current += 1;
+      // Read the post-preparation status even if an earlier poll is still pending.
+      statusGenerationRef.current += 1;
+      void refreshStatus();
+    };
+    void promise.then(refreshAfterPreparation, refreshAfterPreparation);
+  }, [refreshStatus]);
 
   return {
     mode: activeMode,
