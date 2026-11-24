@@ -82,7 +82,7 @@ Details: [docs/SPEC.md, section 2.2](docs/SPEC.md#22-an-sdk-behaviour-that-contr
 
 Caught by deterministic patterns, with no model, after removing invisible characters and folding look-alikes: email addresses, phone numbers in common North American and international formats, payment card numbers that pass the Luhn check, IBANs that pass the mod-97 check, US Social Security numbers in `AAA-GG-SSSS` form, and IPv4 addresses; any other run of 9 or more digits, even inside a URL or split across lines, is masked as an ID.
 Caught by Gemini Nano, best effort: personal names (and later uses of their first or last name alone), street addresses, and other identifiers the model recognises.
-Can be missed: names and addresses Gemini Nano does not recognise (including when text in the input talks it into reporting nothing), identifiers with fewer than 9 digits in formats the patterns do not cover (such as a 7-digit local phone number), a value split between the custom instruction and the text, personal details implied by context ("my neighbour, the only dentist in town"), and anything in images or attachments, which the app does not accept.
+Can be missed: names and addresses Gemini Nano does not recognise (including names or addresses split between the custom instruction and text, or when text in the input talks it into reporting nothing), unseparated 7-digit local phone numbers such as 5550123, short identifiers under 9 digits that are not phone numbers (such as a 6-digit employee ID), personal details implied by context ("my neighbour, the only dentist in town"), and anything in images or attachments, which the app does not accept.
 Treat PII Router as a strong filter, not a guarantee of anonymity.
 
 ## Adversarial review
@@ -135,7 +135,7 @@ src/core/            engine: patterns, redaction, guard, routing, fake model (no
 src/models/          Firebase AI Logic clients: on-device (ONLY_ON_DEVICE) and cloud (ONLY_IN_CLOUD)
 src/firebase-config.ts  the one file to edit to connect a Firebase project
 src/ui/              the app
-src/components/vendor/  components from Magic UI and React Bits
+src/components/vendor/  MIT components from Magic UI
 docs/SPEC.md         the specification: rules as read, data flow, failure behaviour, test plan
 submission/          setup guide, Devpost text, video script, checklist
 ```

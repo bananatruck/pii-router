@@ -14,7 +14,7 @@ function device(overrides: Partial<ModelClient> = {}): ModelClient {
 }
 afterEach(() => vi.unstubAllGlobals());
 describe('exact outbound privacy guarantee', () => {
-  for (const [index, text] of SYNTHETIC_INPUTS.entries()) {
+  for (const [index, { text, sensitiveValues }] of SYNTHETIC_INPUTS.entries()) {
     it.each(tasks)(`corpus ${index + 1}, %s`, async task => {
       const recorder = cloud();
       const local = new RecordingModel(new FakeModel({ location: 'device' }));
@@ -24,6 +24,14 @@ describe('exact outbound privacy guarantee', () => {
       const prompt = recorder.requests[0]?.prompt ?? '';
       expect(prompt).toBe(outcome.trace.outboundPayload);
       expect(outcome.trace.findings.length).toBeGreaterThan(0);
+      const expected = task === 'custom'
+        ? [...sensitiveValues, 'Mary Invented', 'custom@example.org', '202-555-0199', '99 Juniper Street']
+        : sensitiveValues;
+      for (const value of expected) {
+        expect(prompt.toLowerCase(), value).not.toContain(value.toLowerCase());
+        const digits = value.replace(/\D/g, '');
+        if (digits.length >= 7) expect(prompt.replace(/\D/g, ''), value).not.toContain(digits);
+      }
       for (const finding of outcome.trace.findings) {
         expect(prompt.toLowerCase()).not.toContain(finding.value.toLowerCase());
         const digits = finding.value.replace(/\D/g, '');

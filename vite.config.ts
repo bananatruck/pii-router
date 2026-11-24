@@ -21,8 +21,8 @@ function firebaseAiBrowserEntry(): string {
 }
 
 /**
- * Ships the licence and the third-party notices with the built site: the bundled MIT and
- * MIT-plus-Commons-Clause components require their notices in every copy (CodeRabbit review).
+ * Ships the licence and the third-party notices with the built site: the bundled MIT
+ * components require their notices in every copy (CodeRabbit review).
  */
 function shipNotices(): Plugin {
   return {

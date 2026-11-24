@@ -13,6 +13,18 @@ describe('SDK fallback behaviour in ONLY_ON_DEVICE mode when LanguageModel is mi
   const originalFetch = globalThis.fetch;
   let testApp: FirebaseApp | null = null;
 
+  function testAI() {
+    testApp = initializeApp(
+      {
+        apiKey: 'fake-api-key-for-sdk-fallback-test',
+        projectId: 'fake-project-id',
+        appId: '1:000000000000:web:0000000000000000',
+      },
+      'sdk-fallback-test-app',
+    );
+    return getAI(testApp, { backend: new GoogleAIBackend() });
+  }
+
   beforeEach(() => {
     delete (globalThis as Record<string, unknown>).LanguageModel;
     if (typeof window !== 'undefined') {
@@ -21,6 +33,7 @@ describe('SDK fallback behaviour in ONLY_ON_DEVICE mode when LanguageModel is mi
   });
 
   afterEach(async () => {
+    vi.unstubAllGlobals();
     globalThis.fetch = originalFetch;
     if (testApp) {
       await deleteApp(testApp);
@@ -41,15 +54,7 @@ describe('SDK fallback behaviour in ONLY_ON_DEVICE mode when LanguageModel is mi
     globalThis.fetch = fetchStub as unknown as typeof fetch;
 
     // 1. Direct call to the real Firebase AI SDK with ONLY_ON_DEVICE and no LanguageModel on window/globalThis.
-    testApp = initializeApp(
-      {
-        apiKey: 'fake-api-key-for-sdk-fallback-test',
-        projectId: 'fake-project-id',
-        appId: '1:000000000000:web:0000000000000000',
-      },
-      'sdk-fallback-test-app',
-    );
-    const ai = getAI(testApp, { backend: new GoogleAIBackend() });
+    const ai = testAI();
 
     // Confirm we loaded the browser ESM build that has chromeAdapterFactory on the AI service.
     expect(typeof (ai as unknown as { chromeAdapterFactory?: unknown }).chromeAdapterFactory).toBe(
@@ -107,4 +112,30 @@ describe('SDK fallback behaviour in ONLY_ON_DEVICE mode when LanguageModel is mi
     expect(fetchStub).not.toHaveBeenCalled();
     delete (globalThis as Record<string, unknown>).LanguageModel;
   });
+
+  it.each([false, true])('releases a real SDK session after generation, failure=%s', async fails => {
+    const destroy = vi.fn();
+    const prompt = fails
+      ? vi.fn().mockRejectedValue(new Error('Synthetic session failure'))
+      : vi.fn().mockResolvedValue('Synthetic session answer');
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async (options?: { signal?: AbortSignal }) => {
+        expect(options?.signal).toBeInstanceOf(AbortSignal);
+        expect(options?.signal?.aborted).toBe(false);
+        options?.signal?.addEventListener('abort', destroy, { once: true });
+        return { prompt, destroy };
+      },
+    });
+    const fetchStub = vi.fn();
+    globalThis.fetch = fetchStub;
+    const model = new FirebaseOnDeviceModel(testAI());
+    const pending = model.generate({ prompt: 'Synthetic text' });
+    if (fails) await expect(pending).rejects.toThrow('Synthetic session failure');
+    else await expect(pending).resolves.toEqual({ text: 'Synthetic session answer', ranOn: 'device' });
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
 });

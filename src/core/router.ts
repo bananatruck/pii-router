@@ -1,5 +1,5 @@
 import { buildDetectorPrompt, ENTITY_SCHEMA, parseDetectorOutput } from './device-detector';
-import { checkEgress } from './egress-guard';
+import { checkEgress, checkSplitAcrossSegments } from './egress-guard';
 import { normalizeInputDetail } from './normalize';
 import { detectPatterns } from './patterns';
 import { locateEntities, redactSegments, restore } from './redact';
@@ -184,7 +184,10 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
   }
   const payload = buildCloudPrompt(input.task, redaction.redacted.text, redaction.redacted.instruction);
   start = now();
-  const guard = checkEgress(payload, redaction.vault);
+  const egress = checkEgress(payload, redaction.vault);
+  const guard = egress.ok
+    ? checkSplitAcrossSegments(redaction.redacted.instruction, redaction.redacted.text, redaction.vault)
+    : egress;
   step('egress-guard', guard.ok, guard.ok ? 'Payload passed privacy checks.' : guard.reason, start);
   if (!guard.ok) return blocked('egress-guard');
   start = now();
