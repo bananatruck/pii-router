@@ -13,24 +13,45 @@ const PORT = 5181;
 const URL_ = `http://localhost:${PORT}/e2e/sdk-probe.html`;
 const PROMPT_MARKER = 'SYNTHETIC-PROBE';
 
-async function waitForServer(url, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      if ((await fetch(url)).ok) return;
-    } catch {
-      // not up yet
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error(`server at ${url} did not start`);
+/**
+ * Starts the Vite dev server and resolves only when that process itself reports it is serving, so
+ * an older server already on the port can never be probed by mistake. `exited` is set if the
+ * server stops, which fails the probe.
+ */
+function startServer(timeoutMs) {
+  const child = spawn('pnpm', ['exec', 'vite', '--port', String(PORT), '--strictPort'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const state = { child, exited: null };
+  state.ready = new Promise((resolve, reject) => {
+    let output = '';
+    const timer = setTimeout(() => reject(new Error(`vite did not start within ${timeoutMs} ms`)), timeoutMs);
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString();
+      if (output.includes(`localhost:${PORT}`)) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    child.stderr.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.on('exit', (code) => {
+      state.exited = code;
+      clearTimeout(timer);
+      reject(new Error(`vite exited (code ${code}) before serving; is port ${PORT} in use?\n${output.trim()}`));
+    });
+  });
+  // Handled through `ready` and `exited`; avoid an unhandled rejection after a successful start.
+  state.ready.catch(() => {});
+  return state;
 }
 
-const server = spawn('pnpm', ['exec', 'vite', '--port', String(PORT), '--strictPort'], { stdio: ['ignore', 'ignore', 'inherit'] });
+const server = startServer(30000);
 let browser = null;
 let exitCode = 0;
 try {
-  await waitForServer(URL_, 30000);
+  await server.ready;
   browser = await chromium.launch();
   const page = await browser.newPage();
   await page.addInitScript(() => {
@@ -60,6 +81,7 @@ try {
     guardedRequests: attempts.filter((a) => a.phase === 'guarded').length,
   };
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  if (server.exited !== null) throw new Error(`the probe's own vite server exited (code ${server.exited}) during the probe`);
   if (report.languageModelPresent) throw new Error('this browser has the Prompt API; the probe needs one without it');
   if (report.sdkRequestsCarryingPrompt.length === 0) throw new Error('the SDK did not try to send the prompt; SPEC 2.2 may no longer hold');
   if (report.guardedRequests !== 0 || report.guardedModel !== 'threw device-unavailable') throw new Error('the guarded model reached the network');
@@ -70,7 +92,7 @@ try {
   try {
     await browser?.close();
   } finally {
-    server.kill('SIGTERM');
+    server.child.kill('SIGTERM');
   }
 }
 process.exit(exitCode);
