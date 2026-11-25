@@ -144,7 +144,7 @@ The router never asks the on-device model for anything unless its status is `rea
         |                                                   |
         v                                                   |
  [5] egress guard: re-scan the payload with [1] and check   |
-     every vault value is absent; any hit -> BLOCKED        |
+     no vault value is in its user text; any hit -> BLOCKED |
         |                                                   |
         +---- exact payload string ------------------------>| [6] Gemini via Firebase AI Logic,
                                                             |     ONLY_IN_CLOUD, App Check
