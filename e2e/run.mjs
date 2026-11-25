@@ -58,7 +58,8 @@ function startPreview(timeoutMs) {
     const timer = setTimeout(() => reject(new Error(`e2e: vite preview did not start within ${timeoutMs} ms`)), timeoutMs);
     const onData = (chunk) => {
       output += chunk.toString();
-      if (output.includes(`localhost:${PORT}`)) {
+      // Vite colours its output when FORCE_COLOR or CI is set, with escapes inside the URL.
+      if (output.replace(/\x1b\[[0-9;]*m/g, '').includes(`localhost:${PORT}`)) {
         clearTimeout(timer);
         resolve();
       }
