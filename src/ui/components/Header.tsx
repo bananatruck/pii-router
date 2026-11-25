@@ -23,6 +23,16 @@ export function Header({ mode, setMode, deviceStatus, liveReason, locked = false
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {/* Announces state changes only; the download percentage stays out, or every progress
+            update would be read aloud. */}
+        <span
+          role="status"
+          aria-live="polite"
+          data-testid="device-status-announcement"
+          className="sr-only"
+        >
+          {formatDeviceStatusPill(deviceStatus)}
+        </span>
         <span
           data-testid="status-nano"
           className={cn(
