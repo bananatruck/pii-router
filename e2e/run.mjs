@@ -14,7 +14,8 @@ import { chromium } from '@playwright/test';
 const PORT = 4173;
 // Set E2E_BASE_URL to check a deployed copy (for example the GitHub Pages site) instead of a local build.
 const REMOTE = process.env.E2E_BASE_URL;
-const BASE = REMOTE ?? `http://localhost:${PORT}/`;
+// Relative files such as the notices resolve against BASE, so it must end in a slash.
+const BASE = (REMOTE ?? `http://localhost:${PORT}/`).replace(/\/?$/, '/');
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', new URL(BASE).hostname]);
 const SHOTS = new URL('../docs/screenshots/', import.meta.url);
 
