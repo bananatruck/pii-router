@@ -63,7 +63,8 @@ flowchart LR
 6. Gemini in the cloud, created with `InferenceMode.ONLY_IN_CLOUD`, receives only that payload.
 7. The device puts the real values back into the answer.
 
-If the app cannot verify the text on the device (Gemini Nano missing, an error, malformed output, or the SDK reporting a cloud run), it **sends nothing** and says why.
+If the app cannot verify the text on the device (Gemini Nano missing, an error or malformed output), it **sends nothing** and says why.
+If an on-device call reports that it ran in the cloud, the app blocks the run and makes no further model call, but that check happens after the call returns, so the raw text may already have left the device; the app says so.
 The hosted demo has a "Simulate Gemini Nano unavailable" switch so you can see this.
 
 ### Why not `PREFER_ON_DEVICE`
