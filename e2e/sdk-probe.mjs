@@ -7,6 +7,7 @@
 // FirebaseOnDeviceModel sends nothing. Run with `pnpm e2e:sdk`.
 
 import { spawn } from 'node:child_process';
+import { stripVTControlCharacters } from 'node:util';
 import { chromium } from '@playwright/test';
 
 const PORT = 5181;
@@ -30,7 +31,7 @@ function startServer(timeoutMs) {
     child.stdout.on('data', (chunk) => {
       output += chunk.toString();
       // Vite colours its output when FORCE_COLOR or CI is set, with escapes inside the URL.
-      if (output.replace(/\x1b\[[0-9;]*m/g, '').includes(`localhost:${PORT}`)) {
+      if (stripVTControlCharacters(output).includes(`localhost:${PORT}`)) {
         clearTimeout(timer);
         resolve();
       }
