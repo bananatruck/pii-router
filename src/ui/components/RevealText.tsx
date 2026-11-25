@@ -15,15 +15,20 @@ export interface RevealTextProps {
  * Words and the whitespace between them, as written. A complete placeholder is one token even when
  * written with a space ("[EMAIL 1]"), so it can still be rendered as a chip.
  */
-function tokenize(text: string): string[] {
+export function tokenize(text: string): string[] {
   const tokens: string[] = [];
+  // One at a time: spreading a long reply's pieces into push exceeds the argument limit.
+  const add = (piece: string) => {
+    for (const token of piece.split(/(\s+)/)) if (token !== '') tokens.push(token);
+  };
   let cursor = 0;
   for (const match of text.matchAll(new RegExp(PLACEHOLDER_SOURCE, 'gi'))) {
-    tokens.push(...text.slice(cursor, match.index).split(/(\s+)/), match[0]);
+    add(text.slice(cursor, match.index));
+    tokens.push(match[0]);
     cursor = match.index + match[0].length;
   }
-  tokens.push(...text.slice(cursor).split(/(\s+)/));
-  return tokens.filter(token => token !== '');
+  add(text.slice(cursor));
+  return tokens;
 }
 
 export function RevealText({ words, className, renderWord }: RevealTextProps) {
