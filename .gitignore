@@ -9,3 +9,6 @@ playwright-report/
 *.local
 .DS_Store
 .worktrees/
+
+# Recorded demo takes (large binaries; see docs/RECORDING.md)
+submission/video/

@@ -19,5 +19,6 @@
     "noEmit": true,
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src"]
+  "include": ["src", "e2e/**/*.ts"],
+  "exclude": ["src/setup/**/*.test.ts", "src/**/*.measure.test.ts"]
 }

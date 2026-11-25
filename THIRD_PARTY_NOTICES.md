@@ -1,0 +1,63 @@
+# Third-party notices
+
+PII Router is licensed under the Apache License 2.0 (see `LICENSE`).
+It includes or depends on the third-party work listed here, each under its own license.
+This list is the disclosure of pre-existing code that the #BuildHybridAI rules ask for.
+
+## Source code copied into this repository
+
+These files were copied from the libraries' public registries on 2026-11-18 and adapted to this project's TypeScript and lint rules; each file starts with a header naming its source and the changes made.
+
+| File | Library | Source | License |
+|---|---|---|---|
+| `src/components/vendor/animated-beam.tsx` | Magic UI | https://magicui.design/r/animated-beam.json | MIT (below) |
+| `src/components/vendor/border-beam.tsx` | Magic UI | https://magicui.design/r/border-beam.json | MIT (below) |
+
+Components removed because their licences restrict source redistribution:
+
+- The React Bits component was removed on 2026-11-19.
+  Restored values now use `src/ui/components/RestoredValue.tsx`, written for this project under Apache-2.0.
+- An Aceternity UI component was used during the build and removed on 2026-11-18, because its licence forbids re-distributing its source files and this repository is public; the cloud reply's reveal is now `src/ui/components/RevealText.tsx`, written for this project.
+
+21st.dev components were also considered, but its registry requires signing in, so none are included.
+
+## npm dependencies
+
+Runtime dependencies (from `package.json`), with the license each package declares:
+
+| Package | License |
+|---|---|
+| firebase | Apache-2.0 |
+| react, react-dom | MIT |
+| motion | MIT |
+| clsx | MIT |
+| tailwind-merge | MIT |
+| lucide-react | ISC |
+| @fontsource-variable/hanken-grotesk | OFL-1.1 (the Hanken Grotesk font) |
+| @fontsource/jetbrains-mono | OFL-1.1 (the JetBrains Mono font) |
+
+Development tools (Vite, Vitest, TypeScript, ESLint, Tailwind CSS, Playwright, Testing Library) are used to build and test the project and are not shipped in it.
+
+## Magic UI license
+
+MIT License
+
+Copyright (c) Magic UI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
