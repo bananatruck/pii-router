@@ -31,6 +31,53 @@ const GENERIC_TYPES: ReadonlySet<PiiType> = new Set(['ID']);
 const EMAIL_PATTERN =
   /(?<![\w.+$€£-])[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]+@[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?/giu;
 const EMAIL_DOMAIN = /(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)+/giu;
+/** The email pattern. Find matches with `scanEmails`, which gives the same results in linear time. */
+export const EMAIL_REGEX = new RegExp(`${EMAIL_PATTERN.source}${EMAIL_DOMAIN.source}`, EMAIL_PATTERN.flags);
+const EMAIL_STICKY = new RegExp(EMAIL_REGEX.source, 'iuy');
+/** The email pattern's own lookbehind, alone, to test a start position in constant time. */
+const EMAIL_START = /(?<![\w.+$€£-])/iuy;
+// Same class and flags as the pattern's local part: with `i`, characters that only case-fold
+// into the class (U+0345) belong to it too.
+const LOCAL_PART_CHAR = /^[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]$/iu;
+
+function isPair(text: string, at: number): boolean {
+  return /[\uD800-\uDBFF]/.test(text[at] ?? '') && /[\uDC00-\uDFFF]/.test(text[at + 1] ?? '');
+}
+
+/**
+ * The matches of `EMAIL_REGEX`, as `[index, value]`, found in linear time. A match's local part
+ * is a run of local-part characters ending at an `@`, so only such runs can hold a match start.
+ * Searching with the global pattern tried every position of every run, and a run with no `@`
+ * after it was scanned to its end from each position: quadratic on long pasted input. Here each
+ * `@` is tried from the first position of its run that the lookbehind accepts; a later start in
+ * the same run reaches the same `@` and domain, so it cannot succeed where that one failed.
+ */
+export function scanEmails(text: string): Array<readonly [number, string]> {
+  const found: Array<readonly [number, string]> = [];
+  let consumed = 0;
+  for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', at + 1)) {
+    if (at < consumed) continue;
+    // Walk back over the local-part characters before this @, by whole code points.
+    let start = at;
+    while (start > consumed) {
+      const back = start >= 2 && isPair(text, start - 2) ? 2 : 1;
+      if (!LOCAL_PART_CHAR.test(text.slice(start - back, start))) break;
+      start -= back;
+    }
+    for (let position = start; position < at; position += isPair(text, position) ? 2 : 1) {
+      EMAIL_START.lastIndex = position;
+      if (!EMAIL_START.test(text)) continue;
+      EMAIL_STICKY.lastIndex = position;
+      const match = EMAIL_STICKY.exec(text);
+      if (match) {
+        found.push([position, match[0]] as const);
+        consumed = position + match[0].length;
+      }
+      break;
+    }
+  }
+  return found;
+}
 const NA_PHONE_SEPARATED =
   /(?<![\w.+$€£-])(?:\+?1[ .-]?)?(?:\([2-9]\d{2}\)[ .-]?|[2-9]\d{2}[ .-])\d{3}[ .-]?\d{4}(?![\w]|\.\d)/g;
 const NA_PHONE_COMPACT =
@@ -67,8 +114,10 @@ export function detectPatterns(text: string, options: DetectOptions = {}): Patte
       if (valid(value)) hits.push({ type, value, start, end });
     }
   }
-  const emailRegex = new RegExp(`${EMAIL_PATTERN.source}${EMAIL_DOMAIN.source}`, EMAIL_PATTERN.flags);
-  scan('EMAIL', emailRegex);
+  for (const [start, value] of scanEmails(text)) {
+    const end = start + value.length;
+    if (!insidePlaceholder(placeholders, start, end)) hits.push({ type: 'EMAIL', value, start, end });
+  }
   scan('EMAIL', QUOTED_EMAIL);
   scan('IBAN', /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}\b/gi, ibanValid);
   // Try country-length prefixes as prose following a spaced IBAN can be alphanumeric.

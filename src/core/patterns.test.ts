@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ibanValid, luhnValid } from './checksums';
-import { detectPatterns } from './patterns';
+import { detectPatterns, EMAIL_REGEX, scanEmails } from './patterns';
 
 describe('checksums', () => {
   it.each(['4111111111111111', '5555555555554444', '4222222222222', '4000000000000000006'])('accepts published Luhn test card %s', card => expect(luhnValid(card)).toBe(true));
@@ -62,4 +62,46 @@ it.each(['Phone:555-0142', 'Office:555.0177', 'Call:555 0163'])('detects a local
 });
 it.each(['12:555-0142', '12:555.0177', '12:555 0163', 'v:555-0142/8'])('does not classify a numeric colon fragment as a phone: %s', text => {
   expect(detectPatterns(text).some(hit => hit.type === 'PHONE')).toBe(false);
+});
+
+describe('email scanning cost', () => {
+  it('reads a long run of local-part characters with no @ in linear time', () => {
+    // Every position of such a run used to start a match attempt that scanned to its end.
+    const started = performance.now();
+    expect(detectPatterns('!'.repeat(200_000))).toEqual([]);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+  it('finds the same emails as the plain pattern', () => {
+    const oracle = (text: string) =>
+      [...text.matchAll(new RegExp(EMAIL_REGEX))].map(m => [m.index, m[0]] as const);
+    const fixed = [
+      'alice+test@example.com', '$!a@x.com', '€alice@x.com', '\u{1D49C}lice@x.com',
+      'a@b.com@c.org', 'x@abc@d.com', '!!!a@b.co', 'foo.bar+baz@ex-ample.co.uk', 'a@-b.com',
+      'a@b', 'alice@example.com and bob@example.org', '.a@b.com', '-x@y.org', 'a..b@c.de',
+      'a\u0345@example.com', '\u0345a@example.com',
+      'K@x.com', '£!#%@x.io', 'user@@x.com', '@x.com', 'a@b.c d@e.f',
+    ];
+    for (const text of fixed) expect(scanEmails(text), text).toEqual(oracle(text));
+    // A fixed-seed fuzz over characters that matter to the pattern.
+    const alphabet = ['a', 'Z', '7', '!', '#', '@', '.', '-', '+', '$', '€', '£', '_', ' ', '\u{1D49C}', 'é', 'K', 'com'];
+    let seed = 12345;
+    const next = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    for (let i = 0; i < 3000; i++) {
+      const text = Array.from({ length: 1 + Math.floor(next() * 24) }, () => alphabet[Math.floor(next() * alphabet.length)]).join('');
+      expect(scanEmails(text), JSON.stringify(text)).toEqual(oracle(text));
+    }
+  });
+  it('accepts every character in a local part that the plain pattern accepts', () => {
+    // The pattern is case-insensitive, so characters that only case-fold into its classes
+    // (U+0345 folds to a Greek iota) count too. Checked for every code point.
+    const oracle = (text: string) =>
+      [...text.matchAll(new RegExp(EMAIL_REGEX))].map(m => [m.index, m[0]] as const);
+    const differing: string[] = [];
+    for (let cp = 0; cp <= 0x10ffff; cp++) {
+      if (cp >= 0xd800 && cp <= 0xdfff) continue;
+      const text = `a${String.fromCodePoint(cp)}@example.com`;
+      if (JSON.stringify(scanEmails(text)) !== JSON.stringify(oracle(text))) differing.push(cp.toString(16));
+    }
+    expect(differing).toEqual([]);
+  });
 });

@@ -191,7 +191,9 @@ export function App({ liveModels }: AppProps = {}) {
     outcome?.kind === 'answered' &&
     outcome.route !== 'device-only' &&
     outcome.trace.outboundPayload != null;
-  const payloadCrossedSimulated = mode === 'simulated';
+  // Label the crossing by the models that produced the answer on screen, not the current mode:
+  // the automatic switch to Live can happen after a simulated run has finished.
+  const payloadCrossedSimulated = outcome?.simulated ?? mode === 'simulated';
   const egressStep = outcome?.trace.steps.find(s => s.id === 'egress-guard');
 
   return (

@@ -184,7 +184,11 @@ export async function runPipeline(input: RunInput, deps: RouterDeps): Promise<Ru
   }
   const payload = buildCloudPrompt(input.task, redaction.redacted.text, redaction.redacted.instruction);
   start = now();
-  const egress = checkEgress(payload, redaction.vault);
+  const egress = checkEgress(
+    payload,
+    redaction.vault,
+    `${redaction.redacted.instruction}\n${redaction.redacted.text}`,
+  );
   const guard = egress.ok
     ? checkSplitAcrossSegments(redaction.redacted.instruction, redaction.redacted.text, redaction.vault)
     : egress;

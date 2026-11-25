@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { motion, stagger, useAnimate, useReducedMotion } from 'motion/react';
+import { PLACEHOLDER_SOURCE } from '@/core';
 import { cn } from '@/lib/utils';
 
 const MAX_TOTAL_MS = 1200;
@@ -10,10 +11,30 @@ export interface RevealTextProps {
   renderWord?: (word: string, index: number) => ReactNode;
 }
 
+/**
+ * Words and the whitespace between them, as written. A complete placeholder is one token even when
+ * written with a space ("[EMAIL 1]"), so it can still be rendered as a chip.
+ */
+export function tokenize(text: string): string[] {
+  const tokens: string[] = [];
+  // One at a time: spreading a long reply's pieces into push exceeds the argument limit.
+  const add = (piece: string) => {
+    for (const token of piece.split(/(\s+)/)) if (token !== '') tokens.push(token);
+  };
+  let cursor = 0;
+  for (const match of text.matchAll(new RegExp(PLACEHOLDER_SOURCE, 'gi'))) {
+    add(text.slice(cursor, match.index));
+    tokens.push(match[0]);
+    cursor = match.index + match[0].length;
+  }
+  add(text.slice(cursor));
+  return tokens;
+}
+
 export function RevealText({ words, className, renderWord }: RevealTextProps) {
   const [scope, animate] = useAnimate();
   const reduceMotion = useReducedMotion() === true;
-  const tokens = useMemo(() => words.split(/(\s+)/), [words]);
+  const tokens = useMemo(() => tokenize(words), [words]);
 
   const wordCount = useMemo(
     () => tokens.filter(token => !/^\s+$/.test(token)).length,

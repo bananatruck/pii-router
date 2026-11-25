@@ -24,6 +24,17 @@ it('does not block a clean payload because a value appears inside a generated pl
   expect(checkEgress('Write to Son today.', vault).ok).toBe(false);
 });
 
+it('looks for vault values in the user-controlled segments, not the fixed prompt prose', () => {
+  const vault = { entries: new Map([['[PERSON_1]', { type: 'PERSON' as const, value: 'Eve' }]]) };
+  const clean = 'Write to [PERSON_1] today.';
+  // "Never guess" in the fixed prose contains "eve"; the user's redacted text does not.
+  expect(checkEgress(`Never guess.\nText:\n${clean}`, vault, clean)).toEqual({ ok: true });
+  const leaked = 'Write to Eve today.';
+  expect(checkEgress(`Never guess.\nText:\n${leaked}`, vault, leaked).ok).toBe(false);
+  // Patterns are still scanned in the whole payload.
+  expect(checkEgress('Rules: alice@example.com\nText:\nclean', vault, 'clean').ok).toBe(false);
+});
+
 it.each([
   ['Contact alice@', 'example.com', 'EMAIL'],
   ['Contact al', 'ice@example.com', 'EMAIL'],

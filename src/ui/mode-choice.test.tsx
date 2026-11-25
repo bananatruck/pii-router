@@ -58,3 +58,20 @@ it('switches to Live when the models finish loading and the user has not picked 
   releaseImport();
   await waitFor(() => expect(screen.getByTestId('status-mode').textContent).toContain('Live'));
 });
+
+it('keeps a simulated answer labelled simulated after the automatic switch to Live', async () => {
+  const { App } = await import('./App');
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Use sample' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Support email' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+  await waitFor(() => expect(screen.getByTestId('payload-crossed-tag')).toBeTruthy(), {
+    timeout: 5000,
+  });
+  releaseImport();
+  await waitFor(() => expect(screen.getByTestId('status-mode').textContent).toContain('Live'));
+  // The answer on screen came from the simulated models, so its crossing label must say so.
+  expect(screen.getByTestId('payload-crossed-tag').textContent).toContain(
+    'redacted payload passed to the simulated cloud',
+  );
+});

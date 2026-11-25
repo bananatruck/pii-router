@@ -144,7 +144,7 @@ The router never asks the on-device model for anything unless its status is `rea
         |                                                   |
         v                                                   |
  [5] egress guard: re-scan the payload with [1] and check   |
-     every vault value is absent; any hit -> BLOCKED        |
+     no vault value is in its user text; any hit -> BLOCKED |
         |                                                   |
         +---- exact payload string ------------------------>| [6] Gemini via Firebase AI Logic,
                                                             |     ONLY_IN_CLOUD, App Check
@@ -206,7 +206,7 @@ The rule is: if we cannot prove the payload is clean, nothing is sent.
 | `LanguageModel` is missing from the page | The on-device model is reported unavailable and never called, because the SDK would send the prompt to the cloud (section 2.2). |
 | On-device answer is not valid JSON for the schema | Blocked. |
 | `inferenceSource` of an on-device call is not `ON_DEVICE` | Every route is blocked, including device-only, and the user is told the text may already have left the device. |
-| Egress guard finds a detected value or a pattern hit in the payload, or in a folded copy of it (digits joined across line breaks and separators) | Blocked. |
+| Egress guard finds a pattern hit in the payload, or in a folded copy of it (digits joined across line breaks and separators), or a detected value in the redacted text or instruction it carries (the fixed prompt wording is the app's own text and is not searched for values) | Blocked. |
 | Input contains invisible or look-alike characters (zero-width, NBSP, fullwidth digits) | Text and instruction are normalized (NFKC, format characters removed) before any detection; the UI shows the normalized text. |
 | Run is clicked twice, or the mode is switched during a run | One run at a time; the mode switch is disabled while a run is in flight. |
 | Firebase config is still the placeholder | Live mode is off; the cloud model is not constructed; demo mode is offered. |
