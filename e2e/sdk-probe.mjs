@@ -15,14 +15,15 @@ const PROMPT_MARKER = 'SYNTHETIC-PROBE';
 
 /**
  * Starts the Vite dev server and resolves only when that process itself reports it is serving, so
- * an older server already on the port can never be probed by mistake. `exited` is set if the
- * server stops, which fails the probe.
+ * an older server already on the port can never be probed by mistake. `exit` is null until the
+ * server's exit is observed, then `{ code, signal }` (a signal leaves `code` null), and fails
+ * the probe.
  */
 function startServer(timeoutMs) {
   const child = spawn('pnpm', ['exec', 'vite', '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const state = { child, exited: null };
+  const state = { child, exit: null };
   state.ready = new Promise((resolve, reject) => {
     let output = '';
     const timer = setTimeout(() => reject(new Error(`vite did not start within ${timeoutMs} ms`)), timeoutMs);
@@ -37,13 +38,13 @@ function startServer(timeoutMs) {
     child.stderr.on('data', (chunk) => {
       output += chunk.toString();
     });
-    child.on('exit', (code) => {
-      state.exited = code;
+    child.on('exit', (code, signal) => {
+      state.exit = { code, signal };
       clearTimeout(timer);
-      reject(new Error(`vite exited (code ${code}) before serving; is port ${PORT} in use?\n${output.trim()}`));
+      reject(new Error(`vite exited (code ${code}, signal ${signal}) before serving; is port ${PORT} in use?\n${output.trim()}`));
     });
   });
-  // Handled through `ready` and `exited`; avoid an unhandled rejection after a successful start.
+  // Handled through `ready` and `exit`; avoid an unhandled rejection after a successful start.
   state.ready.catch(() => {});
   return state;
 }
@@ -82,7 +83,9 @@ try {
     guardedRequests: attempts.filter((a) => a.phase === 'guarded').length,
   };
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (server.exited !== null) throw new Error(`the probe's own vite server exited (code ${server.exited}) during the probe`);
+  if (server.exit !== null) {
+    throw new Error(`the probe's own vite server exited (code ${server.exit.code}, signal ${server.exit.signal}) during the probe`);
+  }
   if (report.languageModelPresent) throw new Error('this browser has the Prompt API; the probe needs one without it');
   if (report.sdkRequestsCarryingPrompt.length === 0) throw new Error('the SDK did not try to send the prompt; SPEC 2.2 may no longer hold');
   if (report.guardedRequests !== 0 || report.guardedModel !== 'threw device-unavailable') throw new Error('the guarded model reached the network');
