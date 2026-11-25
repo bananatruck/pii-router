@@ -100,11 +100,15 @@ describe('fail closed', () => {
     expect(recorder.requests[0]?.prompt).not.toContain('alice@example.com');
     expect(recorder.requests[0]?.prompt).not.toContain('202-555-0100');
   });
-  it('blocks when a detected value also occurs in the fixed prompt template', async () => {
+  it('does not block when a detected value occurs only in the fixed prompt template', async () => {
+    // The template is the app's own constant text and carries nothing of the user's; the value is
+    // redacted from the user's text, so the request is clean.
     const recorder = cloud();
     const result = await runPipeline({ ...base, text: 'Task for Alice Example' }, { device: device({ generate: async () => ({ text: '{"entities":[{"text":"Task","type":"OTHER"}]}', ranOn: 'device' }) }), cloud: recorder });
-    expect(result).toMatchObject({ kind: 'blocked', reason: 'egress-guard' });
-    expect(recorder.requests).toHaveLength(0);
+    expect(result.kind).toBe('answered');
+    expect(recorder.requests).toHaveLength(1);
+    const userPart = recorder.requests[0]?.prompt.split('\nText:\n')[1] ?? '';
+    expect(userPart).not.toContain('Task');
   });
   it('returns safe errors when cloud is unconfigured or throws', async () => {
     expect(await runPipeline(base, { device: device(), cloud: null })).toMatchObject({ kind: 'error', message: 'The cloud model is not configured.' });

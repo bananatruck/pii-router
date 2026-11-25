@@ -59,7 +59,7 @@ flowchart LR
 2. Gemini Nano, created with `InferenceMode.ONLY_ON_DEVICE` and a JSON schema, finds names, street addresses and other identifiers.
 3. Every value becomes a placeholder; the placeholder-to-value vault lives only in page memory.
 4. Auto routing keeps light tasks on the device and sends heavy ones (rewrite, draft a reply, custom) to the cloud in redacted form.
-5. Before anything is sent, an egress guard re-scans the exact payload, and a folded copy of it, and checks that no vault value, including digit-only forms, is in it.
+5. Before anything is sent, an egress guard re-scans the exact payload, and a folded copy of it, for patterns, and checks that no vault value, including digit-only forms, is in the redacted text and instruction it carries (the app's fixed prompt wording is not user data, so a short name such as Eve is not blocked for appearing inside "Never").
 6. Gemini in the cloud, created with `InferenceMode.ONLY_IN_CLOUD`, receives only that payload.
 7. The device puts the real values back into the answer.
 

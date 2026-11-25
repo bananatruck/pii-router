@@ -167,3 +167,30 @@ it('builds fixed task prompts and includes instructions only for custom tasks', 
     'egress-guard': 'device', 'cloud-call': 'simulated-cloud', restore: 'device',
   });
 });
+
+describe('egress guard and the fixed prompt prose', () => {
+  // The cloud prompt's own rules say "personal details", which contains "son". A name "Son"
+  // redacted from the user's text must not block that clean request, and must still block when
+  // the user's text keeps it.
+  function deviceReporting(name: string): ModelClient {
+    const fake = new FakeModel({ location: 'device' });
+    return {
+      location: 'device', simulated: true, label: fake.label,
+      status: () => fake.status(), prepare: () => fake.prepare(),
+      generate: async request => request.responseSchema
+        ? { text: JSON.stringify({ entities: [{ text: name, type: 'PERSON' }] }), ranOn: 'simulated' }
+        : fake.generate(request),
+    };
+  }
+  it('sends a clean payload although a vault value occurs in the fixed prompt prose', async () => {
+    const cloud = new RecordingModel(new FakeModel({ location: 'cloud' }));
+    const result = await runPipeline(
+      { text: 'Please thank Son for the help.', task: 'rewrite', preference: 'cloud' },
+      { device: deviceReporting('Son'), cloud },
+    );
+    expect(result.kind).toBe('answered');
+    expect(cloud.requests).toHaveLength(1);
+    expect(cloud.requests[0]?.prompt).toContain('personal details');
+    expect(cloud.requests[0]?.prompt).not.toMatch(/\bSon\b/);
+  });
+});

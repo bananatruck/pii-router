@@ -10,14 +10,24 @@ function vaultValueLeaks(payload: string, value: string): boolean {
   return valueDigits.length >= 7 && digits.includes(valueDigits);
 }
 
-export function checkEgress(payload: string, vault: Vault): { ok: true } | { ok: false; reason: string } {
+/**
+ * `payload` is the exact cloud request; it is scanned for patterns in full. Vault values are
+ * looked for in `userControlled`, the redacted instruction and text, because the fixed prompt
+ * prose can contain a short value as text ("personal details" contains "son"). It defaults to the
+ * whole payload.
+ */
+export function checkEgress(
+  payload: string,
+  vault: Vault,
+  userControlled: string = payload,
+): { ok: true } | { ok: false; reason: string } {
   // Only placeholders this run generated are exempt; a lookalike typed by the user is scanned.
   const options = { allowedPlaceholders: new Set(vault.entries.keys()) };
   const hit = detectPatterns(payload, options)[0] ?? detectPatterns(foldPayloadForScan(payload), options)[0];
   if (hit) return { ok: false, reason: `Remaining ${hit.type} pattern.` };
   // Generated placeholders can contain a short value as text ("[PERSON_1]" contains "son"); check
   // the payload with them taken out, so a clean payload is not blocked (CodeRabbit review).
-  let withoutPlaceholders = payload;
+  let withoutPlaceholders = userControlled;
   for (const placeholder of vault.entries.keys()) withoutPlaceholders = withoutPlaceholders.split(placeholder).join(' ');
   for (const { type, value } of vault.entries.values()) {
     if (vaultValueLeaks(withoutPlaceholders, value)) return { ok: false, reason: `Remaining ${type} value.` };
