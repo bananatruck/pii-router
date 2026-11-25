@@ -36,7 +36,9 @@ export const EMAIL_REGEX = new RegExp(`${EMAIL_PATTERN.source}${EMAIL_DOMAIN.sou
 const EMAIL_STICKY = new RegExp(EMAIL_REGEX.source, 'iuy');
 /** The email pattern's own lookbehind, alone, to test a start position in constant time. */
 const EMAIL_START = /(?<![\w.+$€£-])/iuy;
-const LOCAL_PART_CHAR = /^[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]$/u;
+// Same class and flags as the pattern's local part: with `i`, characters that only case-fold
+// into the class (U+0345) belong to it too.
+const LOCAL_PART_CHAR = /^[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]$/iu;
 
 function isPair(text: string, at: number): boolean {
   return /[\uD800-\uDBFF]/.test(text[at] ?? '') && /[\uDC00-\uDFFF]/.test(text[at + 1] ?? '');

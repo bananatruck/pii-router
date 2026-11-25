@@ -78,6 +78,7 @@ describe('email scanning cost', () => {
       'alice+test@example.com', '$!a@x.com', '€alice@x.com', '\u{1D49C}lice@x.com',
       'a@b.com@c.org', 'x@abc@d.com', '!!!a@b.co', 'foo.bar+baz@ex-ample.co.uk', 'a@-b.com',
       'a@b', 'alice@example.com and bob@example.org', '.a@b.com', '-x@y.org', 'a..b@c.de',
+      'a\u0345@example.com', '\u0345a@example.com',
       'K@x.com', '£!#%@x.io', 'user@@x.com', '@x.com', 'a@b.c d@e.f',
     ];
     for (const text of fixed) expect(scanEmails(text), text).toEqual(oracle(text));
@@ -89,5 +90,18 @@ describe('email scanning cost', () => {
       const text = Array.from({ length: 1 + Math.floor(next() * 24) }, () => alphabet[Math.floor(next() * alphabet.length)]).join('');
       expect(scanEmails(text), JSON.stringify(text)).toEqual(oracle(text));
     }
+  });
+  it('accepts every character in a local part that the plain pattern accepts', () => {
+    // The pattern is case-insensitive, so characters that only case-fold into its classes
+    // (U+0345 folds to a Greek iota) count too. Checked for every code point.
+    const oracle = (text: string) =>
+      [...text.matchAll(new RegExp(EMAIL_REGEX))].map(m => [m.index, m[0]] as const);
+    const differing: string[] = [];
+    for (let cp = 0; cp <= 0x10ffff; cp++) {
+      if (cp >= 0xd800 && cp <= 0xdfff) continue;
+      const text = `a${String.fromCodePoint(cp)}@example.com`;
+      if (JSON.stringify(scanEmails(text)) !== JSON.stringify(oracle(text))) differing.push(cp.toString(16));
+    }
+    expect(differing).toEqual([]);
   });
 });
